@@ -1,14 +1,12 @@
-//---------------------------------------------------------------------------
-
 #ifndef TinyFrameH
 #define TinyFrameH
 //---------------------------------------------------------------------------
-
 #include <stdint.h>
 #include <stdbool.h>
+//---------------------------------------------------------------------------
 
 /**
- * TinyFrame receive callback trype.
+ * TinyFrame receive callback type.
  *
  * @param frame_id - ID of the received byte (if response, same as the request)
  * @param buff - byte buffer with the payload

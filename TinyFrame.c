@@ -1,5 +1,7 @@
+//---------------------------------------------------------------------------
 #include "TinyFrame.h"
 #include <string.h>
+//---------------------------------------------------------------------------
 
 /* Note: payload length determines the Rx buffer size. Max 256 */
 #define TF_MAX_PAYLOAD 256
