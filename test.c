@@ -42,9 +42,10 @@ void main()
 
 	printf("------ Simulate sending a message --------\n");
 
-	// Send a message, not expecting any reply
-	// Returns Listener ID (if the listener is not NULL, like here)
-	TF_Send("Hello TinyFrame", 0, NULL);
+	// Send a message
+	//   args - payload, length (0 = strlen), listener, id_ptr (for storing the frame ID)
+	//   (see the .h file for details)
+	TF_Send("Hello TinyFrame", 0, NULL, NULL);
 	// This builds the frame in an internal buffer and sends it to
 	//   TF_WriteImpl()
 
