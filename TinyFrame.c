@@ -5,7 +5,6 @@
 
 /* Note: payload length determines the Rx buffer size. Max 256 */
 #define TF_MAX_PAYLOAD 256
-#define TF_MAX_CALLBACKS 16
 #define TF_SOF_BYTE 0x01
 
 
@@ -17,6 +16,19 @@ enum TFState {
 	TFState_CKSUM     //!< Wait for Checksum
 };
 
+typedef struct _IdListener_struct {
+	unsigned int id;
+	TinyFrameListener fn;
+} IdListener;
+
+typedef struct _TypeListener_struct_ {
+	unsigned char type;
+	TinyFrameListener fn;
+} TypeListener;
+
+typedef struct _GenericListener_struct_ {
+	TinyFrameListener fn;
+} GenericListener;
 
 /**
  * Frame parser internal state
@@ -34,9 +46,14 @@ static struct TinyFrameStruct {
 	unsigned int rxi;       //!< Receive counter (for payload or other fields)
 	unsigned int cksum;     //!< Continually updated checksum
 
-	/* Callbacks */
-	int cb_ids[TF_MAX_CALLBACKS]; //!< Callback frame IDs, -1 = all
-	TinyFrameListener cb_funcs[TF_MAX_CALLBACKS]; //!< Callback funcs, 0 = free slot
+	/* --- Callbacks --- */
+
+	/* Transaction callbacks */
+	IdListener id_listeners[TF_MAX_ID_LST];
+	TypeListener type_listeners[TF_MAX_TYPE_LST];
+	GenericListener generic_listeners[TF_MAX_GEN_LST];
+
+	char sendbuf[TF_MAX_PAYLOAD+1];
 } tf;
 
 
@@ -65,21 +82,65 @@ void TF_ResetParser(void)
 
 
 /**
- * Register a receive callback.
+ * Register a frame type listener.
  *
- * @param frame_id - ID of the frame to receive
- * @param cb - callback func
- * @return Callback slot index (for removing). TF_ERROR (-1) on failure
+ * @param frame_type - frame ID to listen for
+ * @param cb - callback
+ * @return slot index (for removing), or TF_ERROR (-1)
  */
-int TF_AddListener(int frame_id, TinyFrameListener cb)
+int TF_AddIdListener(unsigned int frame_id, TinyFrameListener cb)
 {
 	int i;
 
-	for (i = 0; i < TF_MAX_CALLBACKS; i++) {
-		if (tf.cb_funcs[i] == NULL) {
-			tf.cb_funcs[i] = cb;
-			tf.cb_ids[i] = frame_id;
+	for (i = 0; i < TF_MAX_ID_LST; i++) {
+		if (tf.id_listeners[i].fn == NULL) {
+			tf.id_listeners[i].fn = cb;
+			tf.id_listeners[i].id = frame_id;
 			return i;
+		}
+	}
+
+	return TF_ERROR;
+}
+
+
+/**
+ * Register a frame type listener.
+ *
+ * @param frame_type - frame type to listen for
+ * @param cb - callback
+ * @return slot index (for removing), or TF_ERROR (-1)
+ */
+int TF_AddTypeListener(unsigned char frame_type, TinyFrameListener cb)
+{
+	int i;
+
+	for (i = 0; i < TF_MAX_TYPE_LST; i++) {
+		if (tf.type_listeners[i].fn == NULL) {
+			tf.type_listeners[i].fn = cb;
+			tf.type_listeners[i].type = frame_type;
+			return TF_MAX_ID_LST + i;
+		}
+	}
+
+	return TF_ERROR;
+}
+
+
+/**
+ * Register a generic listener.
+ *
+ * @param cb - callback
+ * @return slot index (for removing), or TF_ERROR (-1)
+ */
+int TF_AddGenericListener(TinyFrameListener cb)
+{
+	int i;
+
+	for (i = 0; i < TF_MAX_GEN_LST; i++) {
+		if (tf.generic_listeners[i].fn == NULL) {
+			tf.generic_listeners[i].fn = cb;
+			return TF_MAX_ID_LST + TF_MAX_TYPE_LST + i;
 		}
 	}
 
@@ -92,9 +153,38 @@ int TF_AddListener(int frame_id, TinyFrameListener cb)
  *
  * @param index - index in the callbacks table
  */
-void TF_RemoveListener(int index)
+void TF_RemoveListener(unsigned int index)
 {
-	tf.cb_funcs[index] = NULL;
+	// all listener arrays share common "address space"
+	if (index < TF_MAX_ID_LST) {
+		tf.id_listeners[index].fn = NULL;
+	}
+	else if (index < TF_MAX_ID_LST + TF_MAX_TYPE_LST) {
+		tf.type_listeners[index - TF_MAX_ID_LST].fn = NULL;
+	}
+	else if (index < TF_MAX_ID_LST + TF_MAX_TYPE_LST + TF_MAX_GEN_LST) {
+		tf.generic_listeners[index - TF_MAX_ID_LST - TF_MAX_TYPE_LST].fn = NULL;
+	}
+}
+
+void TF_RemoveIdListener(unsigned int frame_id)
+{
+	int i;
+	for (i = 0; i < TF_MAX_ID_LST; i++) {
+		if (tf.id_listeners[i].fn != NULL && tf.id_listeners[i].id == frame_id) {
+			tf.id_listeners[i].fn = NULL;
+		}
+	}
+}
+
+void TF_RemoveTypeListener(unsigned char type)
+{
+	int i;
+	for (i = 0; i < TF_MAX_TYPE_LST; i++) {
+		if (tf.type_listeners[i].fn != NULL && tf.type_listeners[i].type == type) {
+			tf.type_listeners[i].fn = NULL;
+		}
+	}
 }
 
 
@@ -107,14 +197,23 @@ void TF_RemoveListenerFn(TinyFrameListener cb)
 {
 	int i;
 
-	for (i = 0; i < TF_MAX_CALLBACKS; i++) {
-		if (tf.cb_funcs[i] == cb) {
-			tf.cb_funcs[i] = NULL;
-			// no break, it can be here multiple times
+	for (i = 0; i < TF_MAX_ID_LST; i++) {
+		if (tf.id_listeners[i].fn == cb) {
+			tf.id_listeners[i].fn = NULL;
 		}
 	}
 
-	return;
+	for (i = 0; i < TF_MAX_TYPE_LST; i++) {
+		if (tf.type_listeners[i].fn == cb) {
+			tf.type_listeners[i].fn = NULL;
+		}
+	}
+
+	for (i = 0; i < TF_MAX_GEN_LST; i++) {
+		if (tf.generic_listeners[i].fn == cb) {
+			tf.generic_listeners[i].fn = NULL;
+		}
+	}
 }
 
 
@@ -142,7 +241,7 @@ void TF_Accept(const unsigned char *buffer, unsigned int count)
 void TF_AcceptChar(unsigned char c)
 {
 	int i;
-	bool rv;
+	bool rv, brk;
 
 	switch (tf.state)
 	{
@@ -177,15 +276,40 @@ void TF_AcceptChar(unsigned char c)
 		if (tf.cksum == (unsigned int)c) {
 			// Add 0 at the end of the data in the buffer (useful if it was a string)
 			tf.pldbuf[tf.rxi] = '\0';
+			brk = false;
 
 			// Fire listeners
-			for (i = 0; i < TF_MAX_CALLBACKS; i++) {
-				// Fire if used & matches
-				if (tf.cb_funcs[i] && (tf.cb_ids[i] == -1 || tf.cb_ids[i] == tf.id)) {
-					rv = tf.cb_funcs[i](tf.id, tf.pldbuf, tf.nob);
+			for (i = 0; i < TF_MAX_ID_LST; i++) {
+				if (tf.id_listeners[i].fn && tf.id_listeners[i].id == tf.id) {
+					rv = tf.id_listeners[i].fn(tf.id, tf.pldbuf, tf.nob);
+					if (rv) {
+						brk = true;
+						break;
+					}
+				}
+			}
 
-					// Unbind
-					if (rv) tf.cb_funcs[i] = NULL;
+			if (!brk) {
+				for (i = 0; i < TF_MAX_TYPE_LST; i++) {
+					if (tf.type_listeners[i].fn &&
+						tf.type_listeners[i].type == tf.pldbuf[0]) {
+						rv = tf.type_listeners[i].fn(tf.id, tf.pldbuf, tf.nob);
+						if (rv) {
+							brk = true;
+							break;
+						}
+					}
+				}
+			}
+
+			if (!brk) {
+				for (i = 0; i < TF_MAX_GEN_LST; i++) {
+					if (tf.generic_listeners[i].fn) {
+						rv = tf.generic_listeners[i].fn(tf.id, tf.pldbuf, tf.nob);
+						if (rv) {
+							break;
+						}
+					}
 				}
 			}
 		} else {
@@ -211,8 +335,8 @@ void TF_AcceptChar(unsigned char c)
  * @return nr of bytes in outbuff used by the frame, -1 on failure
  */
 int TF_Compose(unsigned char *outbuff, unsigned int *msgid,
-               const unsigned char *payload, unsigned int payload_len,
-               int explicit_id
+			   const unsigned char *payload, unsigned int payload_len,
+			   int explicit_id
 ) {
 	unsigned int i;
 	unsigned int id;
@@ -251,4 +375,59 @@ int TF_Compose(unsigned char *outbuff, unsigned int *msgid,
 	if (msgid != NULL) *msgid = id;
 
 	return payload_len + 4;
+}
+
+
+/**
+ * Send a frame, and optionally attach an ID listener for response.
+ *
+ * @param payload - data to send
+ * @param payload_len - nr of bytes to send
+ * @return listener ID if listener was attached, else -1 (FT_ERROR)
+ */
+int TF_Send(const unsigned char *payload,
+			 unsigned int payload_len,
+			 TinyFrameListener listener)
+{
+	unsigned int msgid;
+	int len;
+	int lstid = TF_ERROR;
+	len = TF_Compose(tf.sendbuf, &msgid, payload, payload_len, TF_NEXT_ID);
+	if (listener) lstid = TF_AddIdListener(msgid, listener);
+	TF_WriteImpl(tf.sendbuf, len);
+	return lstid;
+}
+
+
+/**
+ * Send a response to a received message.
+ *
+ * @param payload - data to send
+ * @param payload_len - nr of bytes to send
+ * @param frame_id - ID of the original frame
+ */
+void TF_Respond(const unsigned char *payload,
+			   unsigned int payload_len,
+			   int frame_id)
+{
+	int len;
+	len = TF_Compose(tf.sendbuf, NULL, payload, payload_len, frame_id);
+	TF_WriteImpl(tf.sendbuf, len);
+}
+
+
+int TF_Send1(const unsigned char b0,
+			 TinyFrameListener listener)
+{
+	unsigned char b[] = {b0};
+	return TF_Send(b, 1, listener);
+}
+
+
+int TF_Send2(const unsigned char b0,
+			 const unsigned char b1,
+			 TinyFrameListener listener)
+{
+	unsigned char b[] = {b0, b1};
+	return TF_Send(b, 2, listener);
 }
