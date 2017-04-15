@@ -31,3 +31,6 @@
 # Debug files
 *.dSYM/
 *.su
+
+cmake-build-debug/
+tf.bin
