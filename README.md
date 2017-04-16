@@ -77,28 +77,32 @@ One (not too pretty) way to do this is using a global variable - pseudocode:
 
 ```c
 #define MSG_PING 42
-volatile bool onResponse_done = false;
+
+static volatile bool got_response = false;
 
 /** ID listener */
-bool onResponse(TF_ID frame_id, TF_TYPE type, const uint8_t *data, TF_LEN len)
+static bool onResponse(TF_ID frame_id, TF_TYPE type, const uint8_t *data, TF_LEN len)
 {
     // ... Do something ... 
     // (eg. copy data to a global variable)
     
-    onResponse_done = true;
+    got_response = true;
     return true;
 }
 
 bool syncQuery(void) 
 {
     TF_ID id;
-    // Send our request
+    // Send our request, and bind an ID listener
+    got_response = false;
     TF_Send0(MSG_PING, onResponse, &id); // Send0 sends zero bytes of data, just TYPE
+    
+    // the ID is now in `id` so we can remove the listener after a timeout
     
     // Wait for the response
     bool suc = true;
-    while (!onResponse_done) {
-        //delay
+    while (!got_response) {
+        //delay()
         if (/*timeout*/) {
             TF_RemoveIdListener(id); // free the listener slot
             return false;
