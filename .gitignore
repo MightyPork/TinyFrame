@@ -34,3 +34,6 @@
 
 cmake-build-debug/
 tf.bin
+
+.idea/
+
