@@ -17,7 +17,7 @@ enum TFState {
 	TFState_ID,           //!< Wait for ID
 	TFState_TYPE,         //!< Wait for message type
 	TFState_DATA,         //!< Receive payload
-	TFState_DATA_CKSUM,   //!< Wait for Checksum
+	TFState_DATA_CKSUM    //!< Wait for Checksum
 };
 
 typedef struct _IdListener_struct {
@@ -83,7 +83,7 @@ static struct TinyFrameStruct {
 // ~XOR
 #define CKSUM_RESET(cksum) do { cksum = 0; } while (0)
 #define CKSUM_ADD(cksum, byte) do { cksum ^= byte; } while(0)
-#define CKSUM_FINALIZE(cksum)  do { cksum = ~cksum; } while(0)
+#define CKSUM_FINALIZE(cksum)  do { cksum = (TF_CKSUM)~cksum; } while(0)
 
 #elif TF_CKSUM_TYPE == 16
 
@@ -376,7 +376,7 @@ void _TF_FN TF_AcceptChar(unsigned char c)
 	tf.parser_timeout_ticks = 0;
 
 // DRY snippet - collect multi-byte number from the input stream
-#define COLLECT_NUMBER(dest, type) dest = ((dest) << 8) | c; \
+#define COLLECT_NUMBER(dest, type) dest = (type)(((dest) << 8) | c); \
 								   if (++tf.rxi == sizeof(type))
 
 	#if !TF_USE_SOF_BYTE
@@ -542,8 +542,9 @@ static int _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
 		outbuff[pos++] = b; \
 		xtra; \
 	}
-
-#define WRITENUM(type, num)       WRITENUM_BASE(type, num, )
+	
+#define _NOOP()
+#define WRITENUM(type, num)       WRITENUM_BASE(type, num, _NOOP())
 #define WRITENUM_CKSUM(type, num) WRITENUM_BASE(type, num, CKSUM_ADD(cksum, b))
 
 	// --- Start ---
