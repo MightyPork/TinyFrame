@@ -129,7 +129,7 @@
 /** Peer bit enum (used for init) */
 typedef enum {
 	TF_SLAVE = 0,
-	TF_MASTER = 1,
+	TF_MASTER = 1
 } TF_PEER;
 
 /**
