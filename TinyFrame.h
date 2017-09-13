@@ -58,10 +58,6 @@
 //------------------------- End of user config ------------------------------
 
 
-//----------------------------- USAGE HINTS ---------------------------------
-
-//---------------------------------------------------------------------------
-
 //region Resolve data types
 
 #if TF_LEN_BYTES == 1
@@ -118,6 +114,7 @@
 
 //---------------------------------------------------------------------------
 
+// Return value indicating error state
 #define TF_ERROR -1
 
 // Type-dependent masks for bit manipulation in the ID field
@@ -139,9 +136,7 @@ typedef enum {
  * @param len - number of bytes in the buffer
  * @return true if the frame was consumed
  */
-typedef bool (*TF_LISTENER)(TF_ID frame_id,
-							TF_TYPE type,
-							const uint8_t *data, TF_LEN len);
+typedef bool (*TF_LISTENER)(TF_ID frame_id, TF_TYPE type, const uint8_t *data, TF_LEN len);
 
 /**
  * Initialize the TinyFrame engine.
@@ -265,7 +260,7 @@ bool TF_Respond(TF_TYPE type,
 extern void TF_WriteImpl(const uint8_t *buff, TF_LEN len);
 
 /**
- * This function must be called periodically.
+ * This function should be called periodically.
  *
  * The time base is used to time-out partial frames in the parser and
  * automatically reset it.
