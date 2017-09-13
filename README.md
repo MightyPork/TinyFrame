@@ -9,7 +9,7 @@ communication, as a protocol for FTDI-based PC applications or for messaging thr
 UDP packets. If you find a good use for it, please let me know so I can add it here!
 
 Frames can be protected by a checksum (~XOR, CRC16 or CRC32) and contain 
-a unique ID field which is be used for chaining related messages. The highest bit 
+a unique ID field which can be used for chaining related messages. The highest bit 
 of the generated IDs is different for each peer to avoid collisions.
 Peers are functionally equivalent and can send messages to each other 
 (the names "master" and "slave" are used only for convenience).
