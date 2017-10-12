@@ -108,7 +108,14 @@
 
 
 // Bytes added to TF_MAX_PAYLOAD for the send buffer size.
-#define TF_OVERHEAD_BYTES (1+sizeof(TF_ID)+sizeof(TF_LEN)+sizeof(TF_CKSUM)+sizeof(TF_TYPE)+sizeof(TF_CKSUM))
+#define TF_OVERHEAD_BYTES \
+	(1*TF_USE_SOF_BYTE + \
+		sizeof(TF_ID) + \
+		sizeof(TF_LEN) + \
+		sizeof(TF_CKSUM) + \
+		sizeof(TF_TYPE) + \
+		sizeof(TF_CKSUM) \
+	)
 
 //endregion
 
@@ -129,42 +136,58 @@ typedef enum {
 	TF_MASTER = 1
 } TF_PEER;
 
+/** Data structure for sending / receiving messages */
+typedef struct {
+	TF_ID frame_id,       // message ID
+	bool is_response,     // internal flag, set when using the Respond function. frame_id is then kept unchanged.
+	TF_TYPE type,         // received or sent message type
+	const uint8_t *data,  // buffer of received data or data to send. NULL = listener timed out, free userdata!
+	TF_LEN len,           // length of the buffer
+	void *userdata        // here's a place for custom data; this data will be
+	                      // stored with the listener
+} TF_MSG;
+
+/**
+ * Clear message struct
+ */
+static inline void TF_ClearMsg(TF_MSG *msg)
+{
+	msg->frame_id = 0;
+	msg->is_response = 0;
+	msg->type = 0;
+	msg->data = NULL;
+	msg->len = 0;
+	msg->userdata = NULL;
+}
+
 /**
  * TinyFrame Type Listener callback
+ *
  * @param frame_id - ID of the received frame
+ * @param type - type field from the message
  * @param data - byte buffer with the application data
  * @param len - number of bytes in the buffer
  * @return true if the frame was consumed
  */
-typedef bool (*TF_LISTENER)(TF_ID frame_id, TF_TYPE type, const uint8_t *data, TF_LEN len);
+typedef bool (*TF_LISTENER)(TF_MSG *msg);
 
 /**
  * Initialize the TinyFrame engine.
  * This can also be used to completely reset it (removing all listeners etc)
+ *
  * @param peer_bit - peer bit to use for self
  */
 void TF_Init(TF_PEER peer_bit);
 
 /**
  * Reset the frame parser state machine.
+ * This does not affect registered listeners.
  */
 void TF_ResetParser(void);
 
 /**
- * Accept incoming bytes & parse frames
- * @param buffer - byte buffer to process
- * @param count - nr of bytes in the buffer
- */
-void TF_Accept(const uint8_t *buffer, size_t count);
-
-/**
- * Accept a single incoming byte
- * @param c - a received char
- */
-void TF_AcceptChar(uint8_t c);
-
-/**
  * Register a frame type listener.
+ *
  * @param frame_type - frame ID to listen for
  * @param cb - callback
  * @return slot index (for removing), or TF_ERROR (-1)
@@ -173,12 +196,14 @@ bool TF_AddIdListener(TF_ID frame_id, TF_LISTENER cb);
 
 /**
  * Remove a listener by the message ID it's registered for
+ *
  * @param frame_id - the frame we're listening for
  */
 bool TF_RemoveIdListener(TF_ID frame_id);
 
 /**
  * Register a frame type listener.
+ *
  * @param frame_type - frame type to listen for
  * @param cb - callback
  * @return slot index (for removing), or TF_ERROR (-1)
@@ -187,12 +212,14 @@ bool TF_AddTypeListener(TF_TYPE frame_type, TF_LISTENER cb);
 
 /**
  * Remove a listener by type.
+ *
  * @param type - the type it's registered for
  */
 bool TF_RemoveTypeListener(TF_TYPE type);
 
 /**
  * Register a generic listener.
+ *
  * @param cb - callback
  * @return slot index (for removing), or TF_ERROR (-1)
  */
@@ -200,6 +227,7 @@ bool TF_AddGenericListener(TF_LISTENER cb);
 
 /**
  * Remove a generic listener by function pointer
+ *
  * @param cb - callback function to remove
  */
 bool TF_RemoveGenericListener(TF_LISTENER cb);
@@ -207,50 +235,35 @@ bool TF_RemoveGenericListener(TF_LISTENER cb);
 /**
  * Send a frame, and optionally attach an ID listener.
  *
- * @param type - message type
- * @param data - data to send (can be NULL if 'data_len' is 0)
- * @param data_len - nr of bytes to send
- * @param listener - listener waiting for the response
- * @param id_ptr - store the ID here, NULL to don't store.
- *                 The ID may be used to unbind the listener after a timeout.
+ * @param msg - message struct. ID is stored in the frame_id field
+ * @param listener - listener waiting for the response (can be NULL)
+ * @param timeout - listener expiry time in ticks
  * @return success
  */
-bool TF_Send(TF_TYPE type, const uint8_t *data, TF_LEN data_len,
-			 TF_LISTENER listener,
-			 TF_ID *id_ptr);
-
-/**
- * Like TF_Send(), but no data, just the type
- */
-bool TF_Send0(TF_TYPE type, TF_LISTENER listener, TF_ID *id_ptr);
-
-/**
- * Like TF_Send(), but with just 1 data byte
- */
-bool TF_Send1(TF_TYPE type, uint8_t b1,
-			  TF_LISTENER listener,
-			  TF_ID *id_ptr);
-/**
- * Like TF_Send(), but with just 2 data bytes
- */
-bool TF_Send2(TF_TYPE type, uint8_t b1, uint8_t b2,
-			  TF_LISTENER listener,
-			  TF_ID *id_ptr);
+bool TF_Send(TF_MSG *msg, TF_LISTENER listener, unsigned int timeout);
 
 /**
  * Send a response to a received message.
  *
- * @param type - message type. If an ID listener is waiting for this response,
- *               then 'type' can be used to pass additional information.
- *               Otherwise, 'type' can be used to handle the message using a TypeListener.
- * @param data - data to send
- * @param data_len - nr of bytes to send
- * @param frame_id - ID of the response frame (re-use ID from the original message)
+ * @param msg - message struct. ID is read from frame_id
  * @return success
  */
-bool TF_Respond(TF_TYPE type,
-				const uint8_t *data, TF_LEN data_len,
-				TF_ID frame_id);
+bool TF_Respond(TF_MSG *msg);
+
+/**
+ * Accept incoming bytes & parse frames
+ *
+ * @param buffer - byte buffer to process
+ * @param count - nr of bytes in the buffer
+ */
+void TF_Accept(const uint8_t *buffer, size_t count);
+
+/**
+ * Accept a single incoming byte
+ *
+ * @param c - a received char
+ */
+void TF_AcceptChar(uint8_t c);
 
 /**
  * 'Write bytes' function that sends data to UART

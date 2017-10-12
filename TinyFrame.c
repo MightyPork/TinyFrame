@@ -44,7 +44,7 @@ static struct TinyFrameStruct {
 
 	/* Parser state */
 	enum TFState state;
-	int parser_timeout_ticks;
+	unsigned int parser_timeout_ticks;
 	TF_ID id;               //!< Incoming packet ID
 	TF_LEN len;             //!< Payload length
 	uint8_t data[TF_MAX_PAYLOAD]; //!< Data byte buffer
@@ -542,7 +542,7 @@ static int _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
 		outbuff[pos++] = b; \
 		xtra; \
 	}
-	
+
 #define _NOOP()
 #define WRITENUM(type, num)       WRITENUM_BASE(type, num, _NOOP())
 #define WRITENUM_CKSUM(type, num) WRITENUM_BASE(type, num, CKSUM_ADD(cksum, b))
