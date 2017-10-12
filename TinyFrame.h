@@ -14,7 +14,8 @@
 
 // Maximum send / receive payload size (static buffers size)
 // Larger payloads will be rejected.
-#define TF_MAX_PAYLOAD 1024
+#define TF_MAX_PAYLOAD_RX 1024
+#define TF_MAX_PAYLOAD_TX 1024
 
 // --- Listener counts - determine sizes of the static slot tables ---
 
@@ -57,6 +58,7 @@
 
 //------------------------- End of user config ------------------------------
 
+typedef unsigned int TF_TICKS;
 
 //region Resolve data types
 
@@ -138,12 +140,12 @@ typedef enum {
 
 /** Data structure for sending / receiving messages */
 typedef struct {
-	TF_ID frame_id,       // message ID
-	bool is_response,     // internal flag, set when using the Respond function. frame_id is then kept unchanged.
-	TF_TYPE type,         // received or sent message type
-	const uint8_t *data,  // buffer of received data or data to send. NULL = listener timed out, free userdata!
-	TF_LEN len,           // length of the buffer
-	void *userdata        // here's a place for custom data; this data will be
+	TF_ID frame_id;       // message ID
+	bool is_response;     // internal flag, set when using the Respond function. frame_id is then kept unchanged.
+	TF_TYPE type;         // received or sent message type
+	const uint8_t *data;  // buffer of received data or data to send. NULL = listener timed out, free userdata!
+	TF_LEN len;           // length of the buffer
+	void *userdata;       // here's a place for custom data; this data will be
 	                      // stored with the listener
 } TF_MSG;
 
@@ -188,11 +190,12 @@ void TF_ResetParser(void);
 /**
  * Register a frame type listener.
  *
- * @param frame_type - frame ID to listen for
+ * @param msg - message (contains frame_id and userdata)
  * @param cb - callback
+ * @param timeout - timeout in ticks to auto-remove the listener (0 = keep forever)
  * @return slot index (for removing), or TF_ERROR (-1)
  */
-bool TF_AddIdListener(TF_ID frame_id, TF_LISTENER cb);
+bool TF_AddIdListener(TF_MSG *msg, TF_LISTENER cb, TF_TICKS timeout);
 
 /**
  * Remove a listener by the message ID it's registered for
@@ -240,15 +243,24 @@ bool TF_RemoveGenericListener(TF_LISTENER cb);
  * @param timeout - listener expiry time in ticks
  * @return success
  */
-bool TF_Send(TF_MSG *msg, TF_LISTENER listener, unsigned int timeout);
+bool TF_Send(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout);
 
 /**
  * Send a response to a received message.
  *
  * @param msg - message struct. ID is read from frame_id
+ * @param renew - renew the listener timeout (waiting for more data)
  * @return success
  */
-bool TF_Respond(TF_MSG *msg);
+bool TF_Respond(TF_MSG *msg, bool renew);
+
+/**
+ * Renew ID listener timeout
+ *
+ * @param id - listener ID to renew
+ * @return true if listener was found and renewed
+ */
+bool TF_RenewIdListener(TF_ID id);
 
 /**
  * Accept incoming bytes & parse frames
