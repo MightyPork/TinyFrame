@@ -139,7 +139,7 @@ typedef enum {
 } TF_PEER;
 
 /** Data structure for sending / receiving messages */
-typedef struct {
+typedef struct _TF_MSG_STRUCT_ {
 	TF_ID frame_id;       // message ID
 	bool is_response;     // internal flag, set when using the Respond function. frame_id is then kept unchanged.
 	TF_TYPE type;         // received or sent message type

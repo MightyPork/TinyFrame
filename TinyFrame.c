@@ -40,7 +40,7 @@ typedef struct _GenericListener_struct_ {
 /**
  * Frame parser internal state
  */
-static struct TinyFrameInstance {
+static struct TinyFrameStruct {
 	/* Own state */
 	TF_PEER peer_bit;       //!< Own peer bit (unqiue to avoid msg ID clash)
 	TF_ID next_id;          //!< Next frame / frame chain ID
@@ -341,7 +341,7 @@ static void _TF_FN TF_HandleReceivedMessage(void)
 	// ID listeners first
 	for (i = 0; i < tf.count_id_lst; i++) {
 		ilst = &tf.id_listeners[i];
-		if (ilst->fn && ilst->id == frame_id) {
+		if (ilst->fn && ilst->id == msg.frame_id) {
 			msg.userdata = ilst->userdata;
 			if (ilst->fn(&msg)) return;
 		}
@@ -352,7 +352,7 @@ static void _TF_FN TF_HandleReceivedMessage(void)
 	// Type listeners
 	for (i = 0; i < tf.count_type_lst; i++) {
 		tlst = &tf.type_listeners[i];
-		if (tlst->fn && tlst->type == type) {
+		if (tlst->fn && tlst->type == msg.type) {
 			if (tlst->fn(&msg)) return;
 		}
 	}
@@ -476,7 +476,7 @@ void _TF_FN TF_AcceptChar(unsigned char c)
 
 				CKSUM_RESET(tf.cksum); // Start collecting the payload
 
-				if (tf.len >= TF_MAX_PAYLOAD) {
+				if (tf.len >= TF_MAX_PAYLOAD_RX) {
 					// ERROR - frame too long. Consume, but do not store.
 					tf.discard_data = true;
 				}
@@ -546,7 +546,7 @@ static inline int _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
 	CKSUM_RESET(cksum);
 
 	// sanitize len
-	if (data_len > TF_MAX_PAYLOAD) {
+	if (data_len > TF_MAX_PAYLOAD_TX) {
 		return TF_ERROR;
 	}
 
@@ -626,7 +626,7 @@ bool _TF_FN TF_Send(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout)
 
 	if (len == TF_ERROR) return false;
 
-	if (listener) TF_AddIdListener(msg->frame_id, listener);
+	if (listener) TF_AddIdListener(msg, listener, timeout);
 
 	TF_WriteImpl((const uint8_t *) tf.sendbuf, (TF_LEN)len);
 	return true;
@@ -644,6 +644,7 @@ bool _TF_FN TF_Respond(TF_MSG *msg, bool renew)
 
 bool _TF_FN TF_RenewIdListener(TF_ID id)
 {
+	size_t i;
 	IdListener *lst;
 	for (i = 0; i < tf.count_id_lst; i++) {
 		lst = &tf.id_listeners[i];
@@ -658,7 +659,7 @@ bool _TF_FN TF_RenewIdListener(TF_ID id)
 /** Timebase hook - for timeouts */
 void _TF_FN TF_Tick(void)
 {
-	int i;
+	size_t i;
 	TF_MSG msg;
 	IdListener *lst;
 
@@ -677,7 +678,7 @@ void _TF_FN TF_Tick(void)
 			msg.userdata = lst->userdata;
 			msg.data = NULL; // this is a signal that listener should clean up
 
-			lst->fn(msg);
+			lst->fn(&msg);
 			lst->fn = NULL; // Discard listener
 		}
 	}

@@ -3,6 +3,8 @@
 #include <string.h>
 #include "TinyFrame.h"
 
+typedef unsigned char* pu8;
+
 static void dumpFrame(const uint8_t *buff, TF_LEN len);
 
 /**
@@ -20,19 +22,21 @@ void TF_WriteImpl(const uint8_t *buff, TF_LEN len)
 }
 
 /** An example listener function */
-bool myListener(TF_ID frame_id, TF_TYPE type, const uint8_t *buff, TF_LEN len)
+bool myListener(TF_MSG *msg)
 {
 	printf("\033[33mRX frame\n"
 			   "  type: %02Xh\n"
 			   "  data: \"%.*s\"\n"
 			   "   len: %u\n"
-			   "    id: %Xh\033[0m\n", type, len, buff, len, frame_id);
+			   "    id: %Xh\033[0m\n",
+			   msg->type, msg->len, msg->data, msg->len, msg->frame_id);
 	return true;
 }
 
-bool testIdListener(TF_ID frame_id, TF_TYPE type, const uint8_t *buff, TF_LEN len)
+bool testIdListener(TF_MSG *msg)
 {
-	printf("OK - ID Listener triggered for msg (type %02X, id %Xh)!", type, frame_id);
+	printf("OK - ID Listener triggered for msg (type %02X, id %Xh)!",
+		msg->type, msg->frame_id);
 	return true;
 }
 
@@ -44,20 +48,27 @@ void main(void)
 
 	printf("------ Simulate sending a message --------\n");
 
-	TF_Send(0x22, (unsigned char*)"Hello TinyFrame", 16, NULL, NULL);
+	TF_MSG msg;
+	TF_ClearMsg(&msg);
+	msg.type = 0x22;
+	msg.data = (pu8)"Hello TinyFrame";
+	msg.len = 16;
+	TF_Send(&msg, NULL, 0);
 
 	const char *longstr = "Lorem ipsum dolor sit amet.";
-	TF_Send(0x33, (unsigned char*)longstr, (TF_LEN)(strlen(longstr)+1), NULL, NULL);
+	msg.type = 0x33;
+	msg.data = (pu8)longstr;
+	msg.len = strlen(longstr)+1; // add the null byte
+	TF_Send(&msg, NULL, 0);
 
-	TF_Send(0x44, (unsigned char*)"Hello2", 7, NULL, NULL);
+	msg.type = 0x44;
+	msg.data = (pu8)"Hello2";
+	msg.len = 7;
+	TF_Send(&msg, NULL, 0);
 
-	TF_Send0(0xF0, NULL, NULL);
-
-	TF_Send1(0xF1, 'Q', NULL, NULL);
-
-	TF_Send2(0xF2, 'A', 'Z', NULL, NULL);
-
-	TF_Send0(0x77, testIdListener, NULL);
+	msg.len = 0;
+	msg.type = 0x77;
+	TF_Send(&msg, testIdListener, 0);
 }
 
 // helper func for testing
