@@ -11,7 +11,7 @@ static void dumpFrame(const uint8_t *buff, TF_LEN len);
  * This function should be defined in the application code.
  * It implements the lowest layer - sending bytes to UART (or other)
  */
-void TF_WriteImpl(const uint8_t *buff, TF_LEN len)
+void TF_WriteImpl(const uint8_t *buff, size_t len)
 {
 	printf("--------------------\n");
 	printf("\033[32mTF_WriteImpl - sending frame:\033[0m\n");
@@ -42,23 +42,24 @@ bool testIdListener(TF_MSG *msg)
 
 void main(void)
 {
+	TF_MSG msg;
+	const char *longstr = "Lorem ipsum dolor sit amet.";
+
 	// Set up the TinyFrame library
 	TF_Init(TF_MASTER); // 1 = master, 0 = slave
 	TF_AddGenericListener(myListener);
 
 	printf("------ Simulate sending a message --------\n");
 
-	TF_MSG msg;
 	TF_ClearMsg(&msg);
 	msg.type = 0x22;
 	msg.data = (pu8)"Hello TinyFrame";
 	msg.len = 16;
 	TF_Send(&msg, NULL, 0);
 
-	const char *longstr = "Lorem ipsum dolor sit amet.";
 	msg.type = 0x33;
 	msg.data = (pu8)longstr;
-	msg.len = strlen(longstr)+1; // add the null byte
+	msg.len = (TF_LEN) (strlen(longstr)+1); // add the null byte
 	TF_Send(&msg, NULL, 0);
 
 	msg.type = 0x44;

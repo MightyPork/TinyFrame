@@ -23,8 +23,8 @@ enum TFState {
 typedef struct _IdListener_struct_ {
 	TF_ID id;
 	TF_LISTENER fn;
-	unsigned int timeout;     // nr of ticks remaining to disable this listener
-	unsigned int timeout_max; // the original timeout is stored here
+	TF_COUNT timeout;     // nr of ticks remaining to disable this listener
+	TF_COUNT timeout_max; // the original timeout is stored here
 	void *userdata;
 } IdListener;
 
@@ -51,7 +51,7 @@ static struct TinyFrameStruct {
 	TF_ID id;               //!< Incoming packet ID
 	TF_LEN len;             //!< Payload length
 	uint8_t data[TF_MAX_PAYLOAD_RX]; //!< Data byte buffer
-	size_t rxi;             //!< Byte counter
+	TF_LEN rxi;             //!< Field size byte counter
 	TF_CKSUM cksum;         //!< Checksum calculated of the data stream
 	TF_CKSUM ref_cksum;     //!< Reference checksum read from the message
 	TF_TYPE type;           //!< Collected message type number
@@ -67,9 +67,9 @@ static struct TinyFrameStruct {
 	// Those counters are used to optimize look-up times.
 	// They point to the highest used slot number,
 	// or close to it, depending on the removal order.
-	size_t count_id_lst;
-	size_t count_type_lst;
-	size_t count_generic_lst;
+	TF_COUNT count_id_lst;
+	TF_COUNT count_type_lst;
+	TF_COUNT count_generic_lst;
 
 	// Buffer for building frames
 	uint8_t sendbuf[TF_MAX_PAYLOAD_TX + TF_OVERHEAD_BYTES]; // TODO generate and send frames without a buffer
@@ -210,19 +210,66 @@ void _TF_FN TF_Init(TF_PEER peer_bit)
 
 //region Listeners
 
+/**
+ * Notify callback about ID listener demise & clean it
+ *
+ * @param lst - listener to clean
+ */
+static void _TF_FN cleanup_id_listener(TF_COUNT i, IdListener *lst)
+{
+	TF_MSG msg;
+	if (lst->fn == NULL) return;
+
+	msg.userdata = lst->userdata;
+	msg.data = NULL; // this is a signal that the listener should clean up
+	lst->fn(&msg);
+	lst->fn = NULL; // Discard listener
+
+	if (i == tf.count_id_lst - 1) {
+		tf.count_id_lst--;
+	}
+}
+
+/**
+ * Clean up Type listener
+ *
+ * @param lst - listener to clean
+ */
+static inline void _TF_FN cleanup_type_listener(TF_COUNT i, TypeListener *lst)
+{
+	lst->fn = NULL; // Discard listener
+	if (i == tf.count_type_lst - 1) {
+		tf.count_type_lst--;
+	}
+}
+
+/**
+ * Clean up Generic listener
+ *
+ * @param lst - listener to clean
+ */
+static inline void _TF_FN cleanup_generic_listener(TF_COUNT i, GenericListener *lst)
+{
+	lst->fn = NULL; // Discard listener
+	if (i == tf.count_generic_lst - 1) {
+		tf.count_generic_lst--;
+	}
+}
+
 bool _TF_FN TF_AddIdListener(TF_MSG *msg, TF_LISTENER cb, TF_TICKS timeout)
 {
-	size_t i;
+	TF_COUNT i;
 	IdListener *lst;
 	for (i = 0; i < TF_MAX_ID_LST; i++) {
 		lst = &tf.id_listeners[i];
+		// test for empty slot
 		if (lst->fn == NULL) {
 			lst->fn = cb;
 			lst->id = msg->frame_id;
 			lst->userdata = msg->userdata;
 			lst->timeout_max = lst->timeout = timeout;
 			if (i >= tf.count_id_lst) {
-				tf.count_id_lst = i + 1;
+				tf.count_id_lst = (TF_COUNT) (i + 1);
 			}
 			return true;
 		}
@@ -232,15 +279,16 @@ bool _TF_FN TF_AddIdListener(TF_MSG *msg, TF_LISTENER cb, TF_TICKS timeout)
 
 bool _TF_FN TF_AddTypeListener(TF_TYPE frame_type, TF_LISTENER cb)
 {
-	size_t i;
+	TF_COUNT i;
 	TypeListener *lst;
 	for (i = 0; i < TF_MAX_TYPE_LST; i++) {
 		lst = &tf.type_listeners[i];
+		// test for empty slot
 		if (lst->fn == NULL) {
 			lst->fn = cb;
 			lst->type = frame_type;
 			if (i >= tf.count_type_lst) {
-				tf.count_type_lst = i + 1;
+				tf.count_type_lst = (TF_COUNT) (i + 1);
 			}
 			return true;
 		}
@@ -250,14 +298,15 @@ bool _TF_FN TF_AddTypeListener(TF_TYPE frame_type, TF_LISTENER cb)
 
 bool _TF_FN TF_AddGenericListener(TF_LISTENER cb)
 {
-	size_t i;
+	TF_COUNT i;
 	GenericListener *lst;
 	for (i = 0; i < TF_MAX_GEN_LST; i++) {
 		lst = &tf.generic_listeners[i];
+		// test for empty slot
 		if (lst->fn == NULL) {
 			lst->fn = cb;
 			if (i >= tf.count_generic_lst) {
-				tf.count_generic_lst = i + 1;
+				tf.count_generic_lst = (TF_COUNT) (i + 1);
 			}
 			return true;
 		}
@@ -267,15 +316,13 @@ bool _TF_FN TF_AddGenericListener(TF_LISTENER cb)
 
 bool _TF_FN TF_RemoveIdListener(TF_ID frame_id)
 {
-	size_t i;
+	TF_COUNT i;
 	IdListener *lst;
 	for (i = 0; i < tf.count_id_lst; i++) {
 		lst = &tf.id_listeners[i];
+		// test if live & matching
 		if (lst->fn != NULL && lst->id == frame_id) {
-			lst->fn = NULL;
-			if (i == tf.count_id_lst - 1) {
-				tf.count_id_lst--;
-			}
+			cleanup_id_listener(i, lst);
 			return true;
 		}
 	}
@@ -284,15 +331,13 @@ bool _TF_FN TF_RemoveIdListener(TF_ID frame_id)
 
 bool _TF_FN TF_RemoveTypeListener(TF_TYPE type)
 {
-	size_t i;
+	TF_COUNT i;
 	TypeListener *lst;
 	for (i = 0; i < tf.count_type_lst; i++) {
 		lst = &tf.type_listeners[i];
+		// test if live & matching
 		if (lst->fn != NULL	&& lst->type == type) {
-			lst->fn = NULL;
-			if (i == tf.count_type_lst - 1) {
-				tf.count_type_lst--;
-			}
+			cleanup_type_listener(i, lst);
 			return true;
 		}
 	}
@@ -301,15 +346,13 @@ bool _TF_FN TF_RemoveTypeListener(TF_TYPE type)
 
 bool _TF_FN TF_RemoveGenericListener(TF_LISTENER cb)
 {
-	size_t i;
+	TF_COUNT i;
 	GenericListener *lst;
 	for (i = 0; i < tf.count_generic_lst; i++) {
 		lst = &tf.generic_listeners[i];
+		// test if live & matching
 		if (lst->fn == cb) {
-			lst->fn = NULL;
-			if (i == tf.count_generic_lst - 1) {
-				tf.count_generic_lst--;
-			}
+			cleanup_generic_listener(i, lst);
 			return true;
 		}
 	}
@@ -319,7 +362,7 @@ bool _TF_FN TF_RemoveGenericListener(TF_LISTENER cb)
 /** Handle a message that was just collected & verified by the parser */
 static void _TF_FN TF_HandleReceivedMessage(void)
 {
-	size_t i;
+	TF_COUNT i;
 	IdListener *ilst;
 	TypeListener *tlst;
 	GenericListener *glst;
@@ -342,8 +385,9 @@ static void _TF_FN TF_HandleReceivedMessage(void)
 	for (i = 0; i < tf.count_id_lst; i++) {
 		ilst = &tf.id_listeners[i];
 		if (ilst->fn && ilst->id == msg.frame_id) {
-			msg.userdata = ilst->userdata;
+			msg.userdata = ilst->userdata; // pass userdata pointer to the callback
 			if (ilst->fn(&msg)) return;
+			ilst->userdata = msg.userdata; // put it back (may have changed the pointer or set to NULL)
 		}
 	}
 	msg.userdata = NULL;
@@ -530,24 +574,25 @@ void _TF_FN TF_AcceptChar(unsigned char c)
  * @param len - payload size in bytes
  * @param explicit_id - ID to use in the frame (8-bit)
  * @param use_expl_id - whether to use the previous param
- * @return nr of bytes in outbuff used by the frame, TF_ERROR (-1) on failure
+ * @return nr of bytes in outbuff used by the frame, 0 on failure
  */
-static inline int _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
+static inline size_t _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
 			      TF_TYPE type,
 				  const uint8_t *data, TF_LEN data_len,
 				  TF_ID explicit_id, bool use_expl_id)
 {
-	int i;
+	char si; // signed small int
+	TF_LEN i;
 	uint8_t b;
 	TF_ID id;
 	TF_CKSUM cksum;
-	int pos = 0;
+	size_t pos = 0; // can be needed to grow larger than TF_LEN
 
 	CKSUM_RESET(cksum);
 
 	// sanitize len
 	if (data_len > TF_MAX_PAYLOAD_TX) {
-		return TF_ERROR;
+		return 0;
 	}
 
 	// Gen ID
@@ -566,8 +611,8 @@ static inline int _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
 
 	// DRY helper for writing a multi-byte variable to the buffer
 #define WRITENUM_BASE(type, num, xtra) \
-	for (i = sizeof(type)-1; i>=0; i--) { \
-		b = (uint8_t)(num >> (i*8) & 0xFF); \
+	for (si = sizeof(type)-1; si>=0; si--) { \
+		b = (uint8_t)(num >> (si*8) & 0xFF); \
 		outbuff[pos++] = b; \
 		xtra; \
 	}
@@ -615,7 +660,7 @@ static inline int _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
 
 bool _TF_FN TF_Send(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout)
 {
-	int len;
+	size_t len;
 	len = TF_Compose(tf.sendbuf,
 		             &msg->frame_id,
 		             msg->type,
@@ -624,11 +669,11 @@ bool _TF_FN TF_Send(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout)
 		             msg->frame_id,
 		             msg->is_response);
 
-	if (len == TF_ERROR) return false;
+	if (len == 0) return false;
 
 	if (listener) TF_AddIdListener(msg, listener, timeout);
 
-	TF_WriteImpl((const uint8_t *) tf.sendbuf, (TF_LEN)len);
+	TF_WriteImpl((const uint8_t *) tf.sendbuf, len);
 	return true;
 }
 
@@ -644,11 +689,12 @@ bool _TF_FN TF_Respond(TF_MSG *msg, bool renew)
 
 bool _TF_FN TF_RenewIdListener(TF_ID id)
 {
-	size_t i;
+	TF_COUNT i;
 	IdListener *lst;
 	for (i = 0; i < tf.count_id_lst; i++) {
 		lst = &tf.id_listeners[i];
-		if (lst->fn && lst->id == id) {
+		// test if live & matching
+		if (lst->fn != NULL && lst->id == id) {
 			lst->timeout = lst->timeout_max;
 			return true;
 		}
@@ -659,8 +705,7 @@ bool _TF_FN TF_RenewIdListener(TF_ID id)
 /** Timebase hook - for timeouts */
 void _TF_FN TF_Tick(void)
 {
-	size_t i;
-	TF_MSG msg;
+	TF_COUNT i;
 	IdListener *lst;
 
 	// increment parser timeout (timeout is handled when receiving next byte)
@@ -671,15 +716,11 @@ void _TF_FN TF_Tick(void)
 	// decrement and expire ID listeners
 	for (i = 0; i < tf.count_id_lst; i++) {
 		lst = &tf.id_listeners[i];
-		if (lst->fn && lst->timeout > 0) {
-			if (--lst->timeout != 0) continue;
-
-			// Notify listener about timeout
-			msg.userdata = lst->userdata;
-			msg.data = NULL; // this is a signal that listener should clean up
-
-			lst->fn(&msg);
-			lst->fn = NULL; // Discard listener
+		if (!lst->fn || lst->timeout == 0) continue;
+		// count down...
+		if (--lst->timeout == 0) {
+			// Listener has expired
+			cleanup_id_listener(i, lst);
 		}
 	}
 }

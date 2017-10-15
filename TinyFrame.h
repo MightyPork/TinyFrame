@@ -56,9 +56,14 @@
 // Value of the SOF byte (if TF_USE_SOF_BYTE == 1)
 #define TF_SOF_BYTE     0x01
 
+// used for timeout tick counters - should be large enough for all used timeouts
+typedef uint16_t TF_TICKS;
+
+// used in loops iterating over listeners
+typedef uint8_t TF_COUNT;
+
 //------------------------- End of user config ------------------------------
 
-typedef unsigned int TF_TICKS;
 
 //region Resolve data types
 
@@ -123,9 +128,6 @@ typedef unsigned int TF_TICKS;
 
 //---------------------------------------------------------------------------
 
-// Return value indicating error state
-#define TF_ERROR -1
-
 // Type-dependent masks for bit manipulation in the ID field
 #define TF_ID_MASK (TF_ID)(((TF_ID)1 << (sizeof(TF_ID)*8 - 1)) - 1)
 #define TF_ID_PEERBIT (TF_ID)((TF_ID)1 << ((sizeof(TF_ID)*8) - 1))
@@ -145,8 +147,7 @@ typedef struct _TF_MSG_STRUCT_ {
 	TF_TYPE type;         // received or sent message type
 	const uint8_t *data;  // buffer of received data or data to send. NULL = listener timed out, free userdata!
 	TF_LEN len;           // length of the buffer
-	void *userdata;       // here's a place for custom data; this data will be
-	                      // stored with the listener
+	void *userdata;       // here's a place for custom data; this data will be stored with the listener
 } TF_MSG;
 
 /**
@@ -282,7 +283,7 @@ void TF_AcceptChar(uint8_t c);
  *
  * ! Implement this in your application code !
  */
-extern void TF_WriteImpl(const uint8_t *buff, TF_LEN len);
+extern void TF_WriteImpl(const uint8_t *buff, size_t len);
 
 /**
  * This function should be called periodically.
