@@ -15,9 +15,9 @@
 void demo_sleep(void);
 
 /** Init server - DOES NOT init TinyFrame! */
-void demo_init(TF_PEER peer);
+void demo_init(TF_Peer peer);
 
-/** Disconnect client from the server - claled by a server-side callback */
+/** Disconnect client from the server - can be called by a server-side callback */
 void demo_disconn(void);
 
 #endif //TF_DEMO_H

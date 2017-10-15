@@ -87,8 +87,15 @@
 /** Peer bit enum (used for init) */
 typedef enum {
 	TF_SLAVE = 0,
-	TF_MASTER = 1
-} TF_PEER;
+	TF_MASTER,
+} TF_Peer;
+
+typedef enum {
+	TF_NEXT = 0,   //!< Not handled, let other listeners handle it
+	TF_STAY = 1,   //!< Handled, stay
+	TF_RENEW = 2,  //!< Handled, stay, renew - useful only with listener timeout
+	TF_CLOSE = 3,  //!< Handled, remove self
+} TF_Result;
 
 /** Data structure for sending / receiving messages */
 typedef struct _TF_MSG_STRUCT_ {
@@ -98,13 +105,12 @@ typedef struct _TF_MSG_STRUCT_ {
 	const uint8_t *data;  //!< buffer of received data or data to send. NULL = listener timed out, free userdata!
 	TF_LEN len;           //!< length of the buffer
 	void *userdata;       //!< here's a place for custom data; this data will be stored with the listener
-	bool renew;           //!< Renew the ID listener - if using timeout
-} TF_MSG;
+} TF_Msg;
 
 /**
  * Clear message struct
  */
-static inline void TF_ClearMsg(TF_MSG *msg)
+static inline void TF_ClearMsg(TF_Msg *msg)
 {
 	msg->frame_id = 0;
 	msg->is_response = false;
@@ -112,7 +118,6 @@ static inline void TF_ClearMsg(TF_MSG *msg)
 	msg->data = NULL;
 	msg->len = 0;
 	msg->userdata = NULL;
-	msg->renew = false;
 }
 
 /**
@@ -122,9 +127,9 @@ static inline void TF_ClearMsg(TF_MSG *msg)
  * @param type - type field from the message
  * @param data - byte buffer with the application data
  * @param len - number of bytes in the buffer
- * @return true if the frame was consumed
+ * @return listener result
  */
-typedef bool (*TF_LISTENER)(TF_MSG *msg);
+typedef TF_Result (*TF_Listener)(TF_Msg *msg);
 
 /**
  * Initialize the TinyFrame engine.
@@ -132,7 +137,7 @@ typedef bool (*TF_LISTENER)(TF_MSG *msg);
  *
  * @param peer_bit - peer bit to use for self
  */
-void TF_Init(TF_PEER peer_bit);
+void TF_Init(TF_Peer peer_bit);
 
 /**
  * Reset the frame parser state machine.
@@ -148,7 +153,7 @@ void TF_ResetParser(void);
  * @param timeout - timeout in ticks to auto-remove the listener (0 = keep forever)
  * @return slot index (for removing), or TF_ERROR (-1)
  */
-bool TF_AddIdListener(TF_MSG *msg, TF_LISTENER cb, TF_TICKS timeout);
+bool TF_AddIdListener(TF_Msg *msg, TF_Listener cb, TF_TICKS timeout);
 
 /**
  * Remove a listener by the message ID it's registered for
@@ -164,7 +169,7 @@ bool TF_RemoveIdListener(TF_ID frame_id);
  * @param cb - callback
  * @return slot index (for removing), or TF_ERROR (-1)
  */
-bool TF_AddTypeListener(TF_TYPE frame_type, TF_LISTENER cb);
+bool TF_AddTypeListener(TF_TYPE frame_type, TF_Listener cb);
 
 /**
  * Remove a listener by type.
@@ -179,14 +184,14 @@ bool TF_RemoveTypeListener(TF_TYPE type);
  * @param cb - callback
  * @return slot index (for removing), or TF_ERROR (-1)
  */
-bool TF_AddGenericListener(TF_LISTENER cb);
+bool TF_AddGenericListener(TF_Listener cb);
 
 /**
  * Remove a generic listener by function pointer
  *
  * @param cb - callback function to remove
  */
-bool TF_RemoveGenericListener(TF_LISTENER cb);
+bool TF_RemoveGenericListener(TF_Listener cb);
 
 /**
  * Send a frame, no listener
@@ -194,7 +199,7 @@ bool TF_RemoveGenericListener(TF_LISTENER cb);
  * @param msg - message struct. ID is stored in the frame_id field
  * @return success
  */
-bool TF_Send(TF_MSG *msg);
+bool TF_Send(TF_Msg *msg);
 
 /**
  * Like TF_Send, but without the struct
@@ -204,7 +209,7 @@ bool TF_SendSimple(TF_TYPE type, const uint8_t *data, TF_LEN len);
 /**
  * Like TF_Query, but without the struct
  */
-bool TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_LISTENER listener, TF_TICKS timeout);
+bool TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_Listener listener, TF_TICKS timeout);
 
 /**
  * Send a frame, and optionally attach an ID listener.
@@ -214,7 +219,7 @@ bool TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_LISTENER l
  * @param timeout - listener expiry time in ticks
  * @return success
  */
-bool TF_Query(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout);
+bool TF_Query(TF_Msg *msg, TF_Listener listener, TF_TICKS timeout);
 
 /**
  * Send a response to a received message.
@@ -222,7 +227,7 @@ bool TF_Query(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout);
  * @param msg - message struct. ID is read from frame_id. set ->renew to reset listener timeout
  * @return success
  */
-bool TF_Respond(TF_MSG *msg);
+bool TF_Respond(TF_Msg *msg);
 
 /**
  * Renew ID listener timeout

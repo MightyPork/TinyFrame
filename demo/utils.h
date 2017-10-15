@@ -8,8 +8,19 @@
 #include <stdio.h>
 #include "../TinyFrame.h"
 
+/** pointer to unsigned char */
 typedef unsigned char* pu8;
+
+/**
+ * Dump a binary frame as hex, dec and ASCII
+ */
 void dumpFrame(const uint8_t *buff, size_t len);
-void dumpFrameInfo(TF_MSG *msg);
+
+/**
+ * Dump message metadata (not the content)
+ *
+ * @param msg
+ */
+void dumpFrameInfo(TF_Msg *msg);
 
 #endif //TF_UTILS_H

@@ -2,10 +2,9 @@
 // Created by MightyPork on 2017/10/15.
 //
 
-// http://www.thegeekstuff.com/2011/12/c-socket-programming/?utm_source=feedburner
-
 #include "demo.h"
 
+// those magic defines are needed so we can use clone()
 #define _GNU_SOURCE
 #define __USE_GNU
 #include <sched.h>
@@ -20,15 +19,24 @@
 volatile int sockfd = -1;
 volatile bool conn_disband = false;
 
+/**
+ * Close socket
+ */
 void demo_disconn(void)
 {
 	conn_disband = true;
 	if (sockfd >= 0) close(sockfd);
 }
 
+/**
+ * Demo WriteImpl - send stuff to our peer
+ *
+ * @param buff
+ * @param len
+ */
 void TF_WriteImpl(const uint8_t *buff, size_t len)
 {
-	printf("\033[32m--- TX %ld bytes ---\033[0m\n", len);
+	printf("\033[32mTF_WriteImpl - sending frame:\033[0m\n");
 	dumpFrame(buff, len);
 	usleep(1000);
 
@@ -39,6 +47,13 @@ void TF_WriteImpl(const uint8_t *buff, size_t len)
 	}
 }
 
+
+/**
+ * Client bg thread
+ *
+ * @param unused
+ * @return unused
+ */
 static int demo_client(void* unused)
 {
 	(void)unused;
@@ -81,6 +96,12 @@ static int demo_client(void* unused)
 	return 0;
 }
 
+/**
+ * Server bg thread
+ *
+ * @param unused
+ * @return unused
+ */
 static int demo_server(void* unused)
 {
 	(void)unused;
@@ -136,20 +157,36 @@ static int demo_server(void* unused)
 	return 0;
 }
 
-void signal_handler(int sig)
+/**
+ * Trap - clean up
+ *
+ * @param sig - signal that caused this
+ */
+static void signal_handler(int sig)
 {
 	(void)sig;
 	printf("Shutting down...");
 	demo_disconn();
-	exit(sig);
+
+	exit(sig); // pass the signal through - this is nonstandard behavior but useful for debugging
 }
 
+/**
+ * Sleaping Beauty's fave function
+ */
 void demo_sleep(void)
 {
 	while(1) usleep(10);
 }
 
-void demo_init(TF_PEER peer)
+/**
+ * Start the background thread
+ *
+ * Slave is started first and doesn't normally init transactions - but it could
+ *
+ * @param peer what peer we are
+ */
+void demo_init(TF_Peer peer)
 {
 	signal(SIGTERM, signal_handler);
 	signal(SIGINT, signal_handler);
@@ -163,6 +200,9 @@ void demo_init(TF_PEER peer)
 	}
 
 	printf("Starting %s...\n", peer == TF_MASTER ? "MASTER" : "SLAVE");
+
+	// CLONE_VM    --- share heap
+	// CLONE_FILES --- share stdout and stderr
 	if (peer == TF_MASTER) {
 		retc = clone(&demo_client, (char *)stack+8192, CLONE_VM|CLONE_FILES, 0);
 	} else {

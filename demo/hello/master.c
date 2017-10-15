@@ -5,18 +5,18 @@
 #include <stdio.h>
 #include "../demo.h"
 
-bool testIdListener(TF_MSG *msg)
+TF_Result testIdListener(TF_Msg *msg)
 {
 	printf("testIdListener()\n");
 	dumpFrameInfo(msg);
-	return true;
+	return TF_CLOSE;
 }
 
-bool testGenericListener(TF_MSG *msg)
+TF_Result testGenericListener(TF_Msg *msg)
 {
 	printf("testGenericListener()\n");
 	dumpFrameInfo(msg);
-	return true;
+	return TF_STAY;
 }
 
 int main(void)

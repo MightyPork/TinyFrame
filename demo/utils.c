@@ -21,7 +21,7 @@ void dumpFrame(const uint8_t *buff, size_t len)
 	printf("--- end of frame ---\n\n");
 }
 
-void dumpFrameInfo(TF_MSG *msg)
+void dumpFrameInfo(TF_Msg *msg)
 {
 	printf("\033[33mFrame info\n"
 			   "  type: %02Xh\n"

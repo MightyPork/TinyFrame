@@ -19,22 +19,22 @@ void TF_WriteImpl(const uint8_t *buff, size_t len)
 }
 
 /** An example listener function */
-bool myListener(TF_MSG *msg)
+TF_Result myListener(TF_Msg *msg)
 {
 	dumpFrameInfo(msg);
-	return true;
+	return TF_STAY;
 }
 
-bool testIdListener(TF_MSG *msg)
+TF_Result testIdListener(TF_Msg *msg)
 {
 	printf("OK - ID Listener triggered for msg!\n");
 	dumpFrameInfo(msg);
-	return true;
+	return TF_CLOSE;
 }
 
 void main(void)
 {
-	TF_MSG msg;
+	TF_Msg msg;
 	const char *longstr = "Lorem ipsum dolor sit amet.";
 
 	// Set up the TinyFrame library

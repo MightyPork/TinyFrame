@@ -23,7 +23,7 @@ enum TFState {
 
 typedef struct _IdListener_struct_ {
 	TF_ID id;
-	TF_LISTENER fn;
+	TF_Listener fn;
 	TF_TICKS timeout;     // nr of ticks remaining to disable this listener
 	TF_TICKS timeout_max; // the original timeout is stored here
 	void *userdata;
@@ -31,11 +31,11 @@ typedef struct _IdListener_struct_ {
 
 typedef struct _TypeListener_struct_ {
 	TF_TYPE type;
-	TF_LISTENER fn;
+	TF_Listener fn;
 } TypeListener;
 
 typedef struct _GenericListener_struct_ {
-	TF_LISTENER fn;
+	TF_Listener fn;
 } GenericListener;
 
 /**
@@ -43,7 +43,7 @@ typedef struct _GenericListener_struct_ {
  */
 static struct TinyFrameStruct {
 	/* Own state */
-	TF_PEER peer_bit;       //!< Own peer bit (unqiue to avoid msg ID clash)
+	TF_Peer peer_bit;       //!< Own peer bit (unqiue to avoid msg ID clash)
 	TF_ID next_id;          //!< Next frame / frame chain ID
 
 	/* Parser state */
@@ -201,7 +201,7 @@ static struct TinyFrameStruct {
 //endregion
 
 
-void _TF_FN TF_Init(TF_PEER peer_bit)
+void _TF_FN TF_Init(TF_Peer peer_bit)
 {
 	// Zero it out
 	memset(&tf, 0, sizeof(struct TinyFrameStruct));
@@ -211,6 +211,11 @@ void _TF_FN TF_Init(TF_PEER peer_bit)
 
 //region Listeners
 
+static void _TF_FN renew_id_listener(IdListener *lst)
+{
+	lst->timeout = lst->timeout_max;
+}
+
 /**
  * Notify callback about ID listener demise & clean it
  *
@@ -218,12 +223,16 @@ void _TF_FN TF_Init(TF_PEER peer_bit)
  */
 static void _TF_FN cleanup_id_listener(TF_COUNT i, IdListener *lst)
 {
-	TF_MSG msg;
+	TF_Msg msg;
 	if (lst->fn == NULL) return;
 
-	msg.userdata = lst->userdata;
-	msg.data = NULL; // this is a signal that the listener should clean up
-	lst->fn(&msg);
+	// Make user clean up their data - only if not NULL
+	if (lst->userdata != NULL) {
+		msg.userdata = lst->userdata;
+		msg.data = NULL; // this is a signal that the listener should clean up
+		lst->fn(&msg); // return value is ignored here - use TF_STAY or TF_CLOSE
+	}
+
 	lst->fn = NULL; // Discard listener
 
 	if (i == tf.count_id_lst - 1) {
@@ -257,7 +266,7 @@ static inline void _TF_FN cleanup_generic_listener(TF_COUNT i, GenericListener *
 	}
 }
 
-bool _TF_FN TF_AddIdListener(TF_MSG *msg, TF_LISTENER cb, TF_TICKS timeout)
+bool _TF_FN TF_AddIdListener(TF_Msg *msg, TF_Listener cb, TF_TICKS timeout)
 {
 	TF_COUNT i;
 	IdListener *lst;
@@ -278,7 +287,7 @@ bool _TF_FN TF_AddIdListener(TF_MSG *msg, TF_LISTENER cb, TF_TICKS timeout)
 	return false;
 }
 
-bool _TF_FN TF_AddTypeListener(TF_TYPE frame_type, TF_LISTENER cb)
+bool _TF_FN TF_AddTypeListener(TF_TYPE frame_type, TF_Listener cb)
 {
 	TF_COUNT i;
 	TypeListener *lst;
@@ -297,7 +306,7 @@ bool _TF_FN TF_AddTypeListener(TF_TYPE frame_type, TF_LISTENER cb)
 	return false;
 }
 
-bool _TF_FN TF_AddGenericListener(TF_LISTENER cb)
+bool _TF_FN TF_AddGenericListener(TF_Listener cb)
 {
 	TF_COUNT i;
 	GenericListener *lst;
@@ -345,7 +354,7 @@ bool _TF_FN TF_RemoveTypeListener(TF_TYPE type)
 	return false;
 }
 
-bool _TF_FN TF_RemoveGenericListener(TF_LISTENER cb)
+bool _TF_FN TF_RemoveGenericListener(TF_Listener cb)
 {
 	TF_COUNT i;
 	GenericListener *lst;
@@ -367,9 +376,10 @@ static void _TF_FN TF_HandleReceivedMessage(void)
 	IdListener *ilst;
 	TypeListener *tlst;
 	GenericListener *glst;
+	TF_Result res;
 
 	// Prepare message object
-	TF_MSG msg;
+	TF_Msg msg;
 	msg.frame_id = tf.id;
 	msg.is_response = false;
 	msg.type = tf.type;
@@ -388,10 +398,19 @@ static void _TF_FN TF_HandleReceivedMessage(void)
 	for (i = 0; i < tf.count_id_lst; i++) {
 		ilst = &tf.id_listeners[i];
 		if (ilst->fn && ilst->id == msg.frame_id) {
-			msg.renew = false;
 			msg.userdata = ilst->userdata; // pass userdata pointer to the callback
-			if (ilst->fn(&msg)) return;
+			res = ilst->fn(&msg);
 			ilst->userdata = msg.userdata; // put it back (may have changed the pointer or set to NULL)
+
+			if (res != TF_NEXT) {
+				if (res == TF_CLOSE) {
+					cleanup_id_listener(i, ilst);
+				}
+				else if (res == TF_RENEW) {
+					renew_id_listener(ilst);
+				}
+				return;
+			}
 		}
 	}
 	msg.userdata = NULL;
@@ -401,7 +420,14 @@ static void _TF_FN TF_HandleReceivedMessage(void)
 	for (i = 0; i < tf.count_type_lst; i++) {
 		tlst = &tf.type_listeners[i];
 		if (tlst->fn && tlst->type == msg.type) {
-			if (tlst->fn(&msg)) return;
+			res = tlst->fn(&msg);
+
+			if (res != TF_NEXT) {
+				if (res == TF_CLOSE) {
+					cleanup_type_listener(i, tlst);
+				}
+				return;
+			}
 		}
 	}
 
@@ -409,7 +435,14 @@ static void _TF_FN TF_HandleReceivedMessage(void)
 	for (i = 0; i < tf.count_generic_lst; i++) {
 		glst = &tf.generic_listeners[i];
 		if (glst->fn) {
-			if (glst->fn(&msg)) return;
+			res = glst->fn(&msg);
+
+			if (res != TF_NEXT) {
+				if (res == TF_CLOSE) {
+					cleanup_generic_listener(i, glst);
+				}
+				return;
+			}
 		}
 	}
 }
@@ -671,7 +704,7 @@ static inline size_t _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
 }
 
 // send without listener
-bool _TF_FN TF_Send(TF_MSG *msg)
+bool _TF_FN TF_Send(TF_Msg *msg)
 {
 	return TF_Query(msg, NULL, 0);
 }
@@ -679,7 +712,7 @@ bool _TF_FN TF_Send(TF_MSG *msg)
 // send without listener and struct
 bool _TF_FN TF_SendSimple(TF_TYPE type, const uint8_t *data, TF_LEN len)
 {
-	TF_MSG msg;
+	TF_Msg msg;
 	TF_ClearMsg(&msg);
 	msg.type = type;
 	msg.data = data;
@@ -688,9 +721,9 @@ bool _TF_FN TF_SendSimple(TF_TYPE type, const uint8_t *data, TF_LEN len)
 }
 
 // send without listener and struct
-bool _TF_FN TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_LISTENER listener, TF_TICKS timeout)
+bool _TF_FN TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_Listener listener, TF_TICKS timeout)
 {
-	TF_MSG msg;
+	TF_Msg msg;
 	TF_ClearMsg(&msg);
 	msg.type = type;
 	msg.data = data;
@@ -699,7 +732,7 @@ bool _TF_FN TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_LIS
 }
 
 // send with listener
-bool _TF_FN TF_Query(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout)
+bool _TF_FN TF_Query(TF_Msg *msg, TF_Listener listener, TF_TICKS timeout)
 {
 	size_t len;
 	len = TF_Compose(tf.sendbuf,
@@ -719,13 +752,10 @@ bool _TF_FN TF_Query(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout)
 }
 
 // Like TF_Send, but with explicit frame ID
-bool _TF_FN TF_Respond(TF_MSG *msg)
+bool _TF_FN TF_Respond(TF_Msg *msg)
 {
 	msg->is_response = true;
-	bool suc = TF_Send(msg);
-
-	if (suc && msg->renew) TF_RenewIdListener(msg->frame_id);
-	return suc;
+	return TF_Send(msg);
 }
 
 bool _TF_FN TF_RenewIdListener(TF_ID id)
@@ -736,7 +766,7 @@ bool _TF_FN TF_RenewIdListener(TF_ID id)
 		lst = &tf.id_listeners[i];
 		// test if live & matching
 		if (lst->fn != NULL && lst->id == id) {
-			lst->timeout = lst->timeout_max;
+			renew_id_listener(lst);
 			return true;
 		}
 	}

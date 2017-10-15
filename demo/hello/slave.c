@@ -6,14 +6,14 @@
 #include "../demo.h"
 #include <memory.h>
 
-bool helloListener(TF_MSG *msg)
+TF_Result helloListener(TF_Msg *msg)
 {
 	printf("helloListener()\n");
 	dumpFrameInfo(msg);
-	return true;
+	return TF_STAY;
 }
 
-bool replyListener(TF_MSG *msg)
+TF_Result replyListener(TF_Msg *msg)
 {
 	printf("replyListener()\n");
 	dumpFrameInfo(msg);
@@ -21,8 +21,14 @@ bool replyListener(TF_MSG *msg)
 	msg->len = (TF_LEN) strlen((const char *) msg->data);
 	TF_Respond(msg);
 
+	// unsolicted reply - will not be handled
+	msg->data = (const uint8_t *) "SPAM";
+	msg->len = 5;
+	TF_Respond(msg);
+
+	// unrelated message
 	TF_SendSimple(77, (const uint8_t *) "NAZDAR", 7);
-	return true;
+	return TF_STAY;
 }
 
 int main(void)
