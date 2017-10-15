@@ -10,13 +10,14 @@ UDP packets. If you find a good use for it, please let me know so I can add it h
 
 Frames can be protected by a checksum (~XOR, CRC16 or CRC32) and contain 
 a unique ID field which can be used for chaining related messages. The highest bit 
-of the generated IDs is different for each peer to avoid collisions.
+of the generated IDs is different in each peer to avoid collisions.
 Peers are functionally equivalent and can send messages to each other 
-(the names "master" and "slave" are used only for convenience).
+(the names "master" and "slave" are used only for convenience and have special meaning 
+in the demos).
 
 The library lets you register listeners (callback functions) to wait for (1) any frame, (2)
-a particular frame Type, or (3) a specific message ID. This lets you easily implement asynchronous
-communication.
+a particular frame Type, or (3) a specific message ID. This  high-level API lets you 
+easily implement various async communication patterns.
 
 ## Frame structure
 
@@ -50,24 +51,20 @@ DATA_CKSUM .. checksum, implemented as XOR of all preceding bytes in the message
 - Both peers must include the library with the same parameters (configured at the top of the header file)
 - Start by calling `TF_Init()` with `TF_MASTER` or `TF_SLAVE` as the argument
 - Implement `TF_WriteImpl()` - declared at the bottom of the header file as `extern`.
-  This function is used by `TF_Send()` to write bytes to your UART (or other physical layer).
+  This function is used by `TF_Send()` and others to write bytes to your UART (or other physical layer).
   Presently, always a full frame is sent to this function.
-- If you wish to use `TF_PARSER_TIMEOUT_TICKS`, periodically call `TF_Tick()`. The period 
-  determines the length of 1 tick. This is used to time-out the parser in case it gets stuck 
-  in a bad state (such as receiving a partial frame).
+- If you wish to use timeouts, periodically call `TF_Tick()`. The calling period determines 
+  the length of 1 tick. This is used to time-out the parser in case it gets stuck 
+  in a bad state (such as receiving a partial frame) and can also time-out ID listeners.
 - Bind Type or Generic listeners using `TF_AddTypeListener()` or `TF_AddGenericListener()`.
-- Send a message using `TF_Send()` or the other Send functions.
-  If you provide a listener callback (function pointer) to the function,
-  the listener will be added as an ID listener and wait for a response.
+- Send a message using `TF_Send()`, `TF_Query()`, `TF_SendSimple()`, `TF_QuerySimple()`.
+  Query functions take a listener callback (function pointer)that will be added as 
+  an ID listener and wait for a response.
 - To reply to a message (when your listener gets called), use `TF_Respond()`
-  with the same frame_id as in the received message.
-- Remove the ID listener using `TF_RemoveIdListener()` when it's no longer
-  needed. (Same for other listener types.) The slot count is limited.
-- If the listener function returns `false`, some other listener will get
-  a chance to handle it
+  with the msg boject you received, replacing the `data` pointer (and `len`) with response.
 - Manually reset the parser using `TF_ResetParser()`
 
-### The concept of listeners
+### Message listeners
 
 Listeners are callback functions that are called by TinyFrame when a message which 
 they can handle is received.
@@ -78,52 +75,14 @@ There are 3 listener types:
 - Type listeners
 - Generic listeners
 
-They handle the message in this order, and if they decide not to handle it, they can return `false`
-and let it be handled by some other listener, or discarded.
+Listeners return an enum constant based on what should be done next - remove the listener, 
+keep it, renew it's timeout, or let some other listener handle the message.
 
-### Implementing "synchronous query"
+### Examples
 
-Sometimes it's necessary to send a message and wait for a response to arrive.
+You'll find various examples in the `demo/` folder. Each example has it's own Makefile,
+read it to see what options are available.
 
-One (not too pretty) way to do this is using a global variable - pseudocode:
-
-```c
-#define MSG_PING 42
-
-static volatile bool got_response = false;
-
-/** ID listener */
-static bool onResponse(TF_ID frame_id, TF_TYPE type, const uint8_t *data, TF_LEN len)
-{
-    // ... Do something ... 
-    // (eg. copy data to a global variable)
-    
-    got_response = true;
-    return true;
-}
-
-bool syncQuery(void) 
-{
-    TF_ID id;
-    // Send our request, and bind an ID listener
-    got_response = false;
-    TF_Send0(MSG_PING, onResponse, &id); // Send0 sends zero bytes of data, just TYPE
-    
-    // the ID is now in `id` so we can remove the listener after a timeout
-    
-    // Wait for the response
-    bool suc = true;
-    while (!got_response) {
-        //delay()
-        if (/*timeout*/) {
-            TF_RemoveIdListener(id); // free the listener slot
-            return false;
-        }
-    }
-    
-    // ... Do something with the received data? ...
-    // (can be passed from the listener using a global variable)
-    
-    return true;
-}
-```
+The demos are written for Linux, using sockets and `clone()` for background processing.
+They try to simulate real TinyFrame behavior in an embedded system with asynchronous 
+Rx and Tx. If you can't run the demos, the source files are still good as examples.

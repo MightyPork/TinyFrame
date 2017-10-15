@@ -721,13 +721,14 @@ bool _TF_FN TF_SendSimple(TF_TYPE type, const uint8_t *data, TF_LEN len)
 }
 
 // send without listener and struct
-bool _TF_FN TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_Listener listener, TF_TICKS timeout)
+bool _TF_FN TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_Listener listener, TF_TICKS timeout, void *userdata)
 {
 	TF_Msg msg;
 	TF_ClearMsg(&msg);
 	msg.type = type;
 	msg.data = data;
 	msg.len = len;
+	msg.userdata = userdata;
 	return TF_Query(&msg, listener, timeout);
 }
 

@@ -209,7 +209,7 @@ bool TF_SendSimple(TF_TYPE type, const uint8_t *data, TF_LEN len);
 /**
  * Like TF_Query, but without the struct
  */
-bool TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_Listener listener, TF_TICKS timeout);
+bool TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_Listener listener, TF_TICKS timeout, void *userdata);
 
 /**
  * Send a frame, and optionally attach an ID listener.

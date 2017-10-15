@@ -21,7 +21,7 @@ TF_Result replyListener(TF_Msg *msg)
 	msg->len = (TF_LEN) strlen((const char *) msg->data);
 	TF_Respond(msg);
 
-	// unsolicted reply - will not be handled
+	// unsolicited reply - will not be handled by the ID listener, which is already gone
 	msg->data = (const uint8_t *) "SPAM";
 	msg->len = 5;
 	TF_Respond(msg);
