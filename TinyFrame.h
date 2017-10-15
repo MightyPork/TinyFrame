@@ -20,11 +20,11 @@
 // --- Listener counts - determine sizes of the static slot tables ---
 
 // Frame ID listeners (wait for response / multi-part message)
-#define TF_MAX_ID_LST   20
+#define TF_MAX_ID_LST   10
 // Frame Type listeners (wait for frame with a specific first payload byte)
-#define TF_MAX_TYPE_LST 20
+#define TF_MAX_TYPE_LST 10
 // Generic listeners (fallback if no other listener catches it)
-#define TF_MAX_GEN_LST  4
+#define TF_MAX_GEN_LST  5
 
 // Timeout for receiving & parsing a frame
 // ticks = number of calls to TF_Tick()
@@ -147,12 +147,12 @@ typedef enum {
 
 /** Data structure for sending / receiving messages */
 typedef struct _TF_MSG_STRUCT_ {
-	TF_ID frame_id;       // message ID
-	bool is_response;     // internal flag, set when using the Respond function. frame_id is then kept unchanged.
-	TF_TYPE type;         // received or sent message type
-	const uint8_t *data;  // buffer of received data or data to send. NULL = listener timed out, free userdata!
-	TF_LEN len;           // length of the buffer
-	void *userdata;       // here's a place for custom data; this data will be stored with the listener
+	TF_ID frame_id;       //!< message ID
+	bool is_response;     //!< internal flag, set when using the Respond function. frame_id is then kept unchanged.
+	TF_TYPE type;         //!< received or sent message type
+	const uint8_t *data;  //!< buffer of received data or data to send. NULL = listener timed out, free userdata!
+	TF_LEN len;           //!< length of the buffer
+	void *userdata;       //!< here's a place for custom data; this data will be stored with the listener
 } TF_MSG;
 
 /**
