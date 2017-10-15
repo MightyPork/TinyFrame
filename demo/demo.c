@@ -6,6 +6,10 @@
 
 #include "demo.h"
 
+#define _GNU_SOURCE
+#define __USE_GNU
+#include <sched.h>
+
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -35,9 +39,10 @@ void TF_WriteImpl(const uint8_t *buff, size_t len)
 	}
 }
 
-static bool demo_client(void)
+static int demo_client(void* unused)
 {
-	pid_t childPID;
+	(void)unused;
+
 	ssize_t n = 0;
 	uint8_t recvBuff[1024];
 	struct sockaddr_in serv_addr;
@@ -66,42 +71,29 @@ static bool demo_client(void)
 		return false;
 	}
 
-	childPID = fork();
-	if (childPID >= 0) { // fork was successful
-		if (childPID == 0) {// child process
-			printf("\n Child Process \n");
+	printf("\n Child Process \n");
 
-			while ((n = read(sockfd, recvBuff, sizeof(recvBuff) - 1)) > 0 && !conn_disband) {
-				dumpFrame(recvBuff, (size_t) n);
-				TF_Accept(recvBuff, (size_t) n);
-			}
-			printf("\n End read \n");
-
-			if (n < 0) {
-				printf("\n Read error \n");
-			}
-
-			printf("\n Close sock \n");
-			close(sockfd);
-			sockfd = -1;
-
-			return true;
-		}
-		else { //Parent process
-			printf("\n Parent process \n");
-
-			return true;
-		}
+	while ((n = read(sockfd, recvBuff, sizeof(recvBuff) - 1)) > 0) {
+		dumpFrame(recvBuff, (size_t) n);
+		TF_Accept(recvBuff, (size_t) n);
 	}
-	else { // fork failed
-		printf("\n Fork failed!!!!!! \n");
-		return false;
-	}
+//	printf("\n End read \n");
+//
+//	if (n < 0) {
+//		printf("\n Read error \n");
+//	}
+//
+//	printf("\n Close sock \n");
+//	close(sockfd);
+//	sockfd = -1;
+//
+//	return true;
+	return 0;
 }
 
-static bool demo_server(void)
+static int demo_server(void* unused)
 {
-	pid_t childPID;
+	(void)unused;
 	ssize_t n;
 	int listenfd = 0;
 	uint8_t recvBuff[1024];
@@ -121,54 +113,37 @@ static bool demo_server(void)
 	serv_addr.sin_port = htons(PORT);
 
 	if (bind(listenfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-		perror("Failed to bind ");
-		return false;
+		perror("Failed to bind");
+		return 1;
 	}
 
 	if (listen(listenfd, 10) < 0) {
-		perror("Failed to listen ");
-		return false;
+		perror("Failed to listen");
+		return 1;
 	}
 
-	childPID = fork();
-	if (childPID >= 0) { // fork was successful
-		if (childPID == 0) {// child process
-			printf("\n Child Process \n");
+	while (1) {
+		printf("\nWaiting for client...\n");
+		sockfd = accept(listenfd, (struct sockaddr *) NULL, NULL);
+		setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&option, sizeof(option));
+		printf("\nClient connected\n");
+		conn_disband = false;
 
-			while (1) {
-				printf("\nWaiting for client...\n");
-				sockfd = accept(listenfd, (struct sockaddr *) NULL, NULL);
-				setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&option, sizeof(option));
-				printf("\nClient connected\n");
-				conn_disband = false;
-
-				while ((n = read(sockfd, recvBuff, sizeof(recvBuff) - 1)) > 0 && !conn_disband) {
-					printf("...read %ld\n", n);
-					dumpFrame(recvBuff, n);
-					TF_Accept(recvBuff, (size_t) n);
-				}
-
-				if (n < 0) {
-					printf("\n Read error \n");
-				}
-
-				printf("Closing socket\n");
-				close(sockfd);
-				sockfd = -1;
-			}
-
-			return true;
+		while ((n = read(sockfd, recvBuff, sizeof(recvBuff) - 1)) > 0 && !conn_disband) {
+			printf("...read %ld\n", n);
+			dumpFrame(recvBuff, n);
+			TF_Accept(recvBuff, (size_t) n);
 		}
-		else { //Parent process
-			printf("\n Parent process \n");
 
-			return true;
+		if (n < 0) {
+			printf("\n Read error \n");
 		}
+
+		printf("Closing socket\n");
+		close(sockfd);
+		sockfd = -1;
 	}
-	else { // fork failed
-		printf("\n Fork failed!!!!!! \n");
-		return false;
-	}
+	return 0;
 }
 
 void signal_handler(int sig)
@@ -176,7 +151,7 @@ void signal_handler(int sig)
 	(void)sig;
 	printf("Shutting down...");
 	demo_disconn();
-	exit(0);
+	exit(sig);
 }
 
 void demo_init(TF_PEER peer)
@@ -184,14 +159,26 @@ void demo_init(TF_PEER peer)
 	signal(SIGTERM, signal_handler);
 	signal(SIGINT, signal_handler);
 
-	bool suc;
-	if (peer == TF_MASTER) {
-		suc = demo_client();
-	} else {
-		suc = demo_server();
+	int retc;
+	void *stack = malloc(8192);
+	if (stack == NULL) {
+		perror("Oh fuck");
+		signal_handler(9);
+		return;
 	}
 
-	if (!suc) {
-		signal_handler(9);
+	printf("Starting %s...\n", peer == TF_MASTER ? "MASTER" : "SLAVE");
+	if (peer == TF_MASTER) {
+		retc = clone(&demo_client, (char *)stack+8192, CLONE_VM|CLONE_FILES, 0);
+	} else {
+		retc = clone(&demo_server, (char *)stack+8192, CLONE_VM|CLONE_FILES, 0);
 	}
+
+	if (retc == 0) {
+		perror("Clone fail");
+		signal_handler(9);
+		return;
+	}
+
+	printf("Thread started\n");
 }

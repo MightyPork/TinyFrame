@@ -10,7 +10,7 @@ void dumpFrame(const uint8_t *buff, size_t len)
 {
 	size_t i;
 	for(i = 0; i < len; i++) {
-		printf("%3u \033[34m%02X\033[0m", buff[i], buff[i]);
+		printf("%3u \033[94m%02X\033[0m", buff[i], buff[i]);
 		if (buff[i] >= 0x20 && buff[i] < 127) {
 			printf(" %c", buff[i]);
 		} else {
