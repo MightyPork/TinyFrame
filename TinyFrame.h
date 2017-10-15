@@ -49,7 +49,12 @@
 #define TF_TYPE_BYTES   1
 
 // Select checksum type (0 = none, 8 = ~XOR, 16 = CRC16 0x8005, 32 = CRC32)
-#define TF_CKSUM_TYPE   16
+#define TF_CKSUM_NONE 0
+#define TF_CKSUM_XOR 8
+#define TF_CKSUM_CRC16 16
+#define TF_CKSUM_CRC32 32
+
+#define TF_CKSUM_TYPE   TF_CKSUM_CRC16
 
 // Use a SOF byte to mark the start of a frame
 #define TF_USE_SOF_BYTE 1
@@ -100,13 +105,13 @@ typedef uint8_t TF_COUNT;
 #endif
 
 
-#if TF_CKSUM_TYPE == 8 || TF_CKSUM_TYPE == 0
+#if TF_CKSUM_TYPE == TF_CKSUM_XOR || TF_CKSUM_TYPE == TF_CKSUM_NONE
 	// ~XOR (if 0, still use 1 byte - it won't be used)
 	typedef uint8_t TF_CKSUM;
-#elif TF_CKSUM_TYPE == 16
+#elif TF_CKSUM_TYPE == TF_CKSUM_CRC16
 	// CRC16
 	typedef uint16_t TF_CKSUM;
-#elif TF_CKSUM_TYPE == 32
+#elif TF_CKSUM_TYPE == TF_CKSUM_CRC32
 	// CRC32
 	typedef uint32_t TF_CKSUM;
 #else

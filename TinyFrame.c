@@ -23,8 +23,8 @@ enum TFState {
 typedef struct _IdListener_struct_ {
 	TF_ID id;
 	TF_LISTENER fn;
-	TF_COUNT timeout;     // nr of ticks remaining to disable this listener
-	TF_COUNT timeout_max; // the original timeout is stored here
+	TF_TICKS timeout;     // nr of ticks remaining to disable this listener
+	TF_TICKS timeout_max; // the original timeout is stored here
 	void *userdata;
 } IdListener;
 
@@ -77,21 +77,21 @@ static struct TinyFrameStruct {
 
 //region Checksums
 
-#if TF_CKSUM_TYPE == 0
+#if TF_CKSUM_TYPE == TF_CKSUM_NONE
 
 	// NONE
 	#define CKSUM_RESET(cksum)
 	#define CKSUM_ADD(cksum, byte)
 	#define CKSUM_FINALIZE(cksum)
 
-#elif TF_CKSUM_TYPE == 8
+#elif TF_CKSUM_TYPE == TF_CKSUM_XOR
 
 	// ~XOR
 	#define CKSUM_RESET(cksum) do { cksum = 0; } while (0)
 	#define CKSUM_ADD(cksum, byte) do { cksum ^= byte; } while(0)
 	#define CKSUM_FINALIZE(cksum)  do { cksum = (TF_CKSUM)~cksum; } while(0)
 
-#elif TF_CKSUM_TYPE == 16
+#elif TF_CKSUM_TYPE == TF_CKSUM_CRC16
 
 	/** CRC table for the CRC-16. The poly is 0x8005 (x^16 + x^15 + x^2 + 1) */
 	static const uint16_t crc16_table[256] = {
@@ -138,7 +138,7 @@ static struct TinyFrameStruct {
 	#define CKSUM_ADD(cksum, byte) do { cksum = crc16_byte(cksum, byte); } while(0)
 	#define CKSUM_FINALIZE(cksum)
 
-#elif TF_CKSUM_TYPE == 32
+#elif TF_CKSUM_TYPE == TF_CKSUM_CRC32
 
 	static const uint32_t crc32_table[] = { /* CRC polynomial 0xedb88320 */
 		0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
@@ -191,9 +191,9 @@ static struct TinyFrameStruct {
 		return (crc32_table[((cksum) ^ ((uint8_t)byte)) & 0xff] ^ ((cksum) >> 8));
 	}
 
-	#define CKSUM_RESET(cksum) do { cksum = (TF_CKSUM)0xFFFFFFFF; } while (0)
-	#define CKSUM_ADD(cksum, byte) do { cksum = crc32_byte(cksum, byte); } while(0)
-	#define CKSUM_FINALIZE(cksum)  do { cksum = (TF_CKSUM)~cksum; } while(0)
+	#define CKSUM_RESET(cksum) do { (cksum) = (TF_CKSUM)0xFFFFFFFF; } while (0)
+	#define CKSUM_ADD(cksum, byte) do { (cksum) = crc32_byte(cksum, byte); } while(0)
+	#define CKSUM_FINALIZE(cksum)  do { (cksum) = (TF_CKSUM)~(cksum); } while(0)
 
 #endif
 
@@ -486,7 +486,7 @@ void _TF_FN TF_AcceptChar(unsigned char c)
 		case TFState_TYPE:
 			CKSUM_ADD(tf.cksum, c);
 			COLLECT_NUMBER(tf.type, TF_TYPE) {
-				#if TF_CKSUM_TYPE == 0
+				#if TF_CKSUM_TYPE == TF_CKSUM_NONE
 					tf.state = TFState_DATA;
 					tf.rxi = 0;
 				#else
@@ -536,7 +536,7 @@ void _TF_FN TF_AcceptChar(unsigned char c)
 			}
 
 			if (tf.rxi == tf.len) {
-				#if TF_CKSUM_TYPE == 0
+				#if TF_CKSUM_TYPE == TF_CKSUM_NONE
 					// All done
 					TF_HandleReceivedMessage();
 					TF_ResetParser();
@@ -581,12 +581,14 @@ static inline size_t _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
 				  const uint8_t *data, TF_LEN data_len,
 				  TF_ID explicit_id, bool use_expl_id)
 {
-	char si; // signed small int
-	TF_LEN i;
-	uint8_t b;
-	TF_ID id;
-	TF_CKSUM cksum;
+	char si = 0; // signed small int
+	TF_LEN i = 0;
+	uint8_t b = 0;
+	TF_ID id = 0;
+	TF_CKSUM cksum = 0;
 	size_t pos = 0; // can be needed to grow larger than TF_LEN
+
+	(void)cksum;
 
 	CKSUM_RESET(cksum);
 
@@ -633,7 +635,7 @@ static inline size_t _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
 	WRITENUM_CKSUM(TF_LEN, data_len);
 	WRITENUM_CKSUM(TF_TYPE, type);
 
-	#if TF_CKSUM_TYPE != 0
+	#if TF_CKSUM_TYPE != TF_CKSUM_NONE
 		CKSUM_FINALIZE(cksum);
 		WRITENUM(TF_CKSUM, cksum);
 	#endif
@@ -649,7 +651,7 @@ static inline size_t _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
 			CKSUM_ADD(cksum, b);
 		}
 
-		#if TF_CKSUM_TYPE != 0
+		#if TF_CKSUM_TYPE != TF_CKSUM_NONE
 			CKSUM_FINALIZE(cksum);
 			WRITENUM(TF_CKSUM, cksum);
 		#endif
@@ -705,7 +707,7 @@ bool _TF_FN TF_RenewIdListener(TF_ID id)
 /** Timebase hook - for timeouts */
 void _TF_FN TF_Tick(void)
 {
-	TF_COUNT i;
+	TF_COUNT i = 0;
 	IdListener *lst;
 
 	// increment parser timeout (timeout is handled when receiving next byte)
