@@ -1,6 +1,7 @@
 //---------------------------------------------------------------------------
 #include "TinyFrame.h"
 #include <string.h>
+//#include "demo/utils.h"
 //---------------------------------------------------------------------------
 
 // Compatibility with ESP8266 SDK
@@ -87,9 +88,9 @@ static struct TinyFrameStruct {
 #elif TF_CKSUM_TYPE == TF_CKSUM_XOR
 
 	// ~XOR
-	#define CKSUM_RESET(cksum) do { cksum = 0; } while (0)
-	#define CKSUM_ADD(cksum, byte) do { cksum ^= byte; } while(0)
-	#define CKSUM_FINALIZE(cksum)  do { cksum = (TF_CKSUM)~cksum; } while(0)
+	#define CKSUM_RESET(cksum) do { (cksum) = 0; } while (0)
+	#define CKSUM_ADD(cksum, byte) do { (cksum) ^= (byte); } while(0)
+	#define CKSUM_FINALIZE(cksum)  do { (cksum) = (TF_CKSUM)~cksum; } while(0)
 
 #elif TF_CKSUM_TYPE == TF_CKSUM_CRC16
 
@@ -134,8 +135,8 @@ static struct TinyFrameStruct {
 		return (cksum >> 8) ^ crc16_table[(cksum ^ byte) & 0xff];
 	}
 
-	#define CKSUM_RESET(cksum) do { cksum = 0; } while (0)
-	#define CKSUM_ADD(cksum, byte) do { cksum = crc16_byte(cksum, byte); } while(0)
+	#define CKSUM_RESET(cksum) do { (cksum) = 0; } while (0)
+	#define CKSUM_ADD(cksum, byte) do { (cksum) = crc16_byte((cksum), (byte)); } while(0)
 	#define CKSUM_FINALIZE(cksum)
 
 #elif TF_CKSUM_TYPE == TF_CKSUM_CRC32
@@ -375,6 +376,8 @@ static void _TF_FN TF_HandleReceivedMessage(void)
 	msg.data = tf.data;
 	msg.len = tf.len;
 
+	//dumpFrameInfo(&msg);
+
 	// Any listener can consume the message (return true),
 	// or let someone else handle it.
 
@@ -385,6 +388,7 @@ static void _TF_FN TF_HandleReceivedMessage(void)
 	for (i = 0; i < tf.count_id_lst; i++) {
 		ilst = &tf.id_listeners[i];
 		if (ilst->fn && ilst->id == msg.frame_id) {
+			msg.renew = false;
 			msg.userdata = ilst->userdata; // pass userdata pointer to the callback
 			if (ilst->fn(&msg)) return;
 			ilst->userdata = msg.userdata; // put it back (may have changed the pointer or set to NULL)
@@ -561,6 +565,12 @@ void _TF_FN TF_AcceptChar(unsigned char c)
 			}
 			break;
 	}
+
+	// we get here after finishing HEAD, if no data are to be received - handle and clear
+	if (tf.len == 0 && tf.state == TFState_DATA) {
+		TF_HandleReceivedMessage();
+		TF_ResetParser();
+	}
 }
 
 /**
@@ -660,7 +670,36 @@ static inline size_t _TF_FN TF_Compose(uint8_t *outbuff, TF_ID *id_ptr,
 	return pos;
 }
 
-bool _TF_FN TF_Send(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout)
+// send without listener
+bool _TF_FN TF_Send(TF_MSG *msg)
+{
+	return TF_Query(msg, NULL, 0);
+}
+
+// send without listener and struct
+bool _TF_FN TF_SendSimple(TF_TYPE type, const uint8_t *data, TF_LEN len)
+{
+	TF_MSG msg;
+	TF_ClearMsg(&msg);
+	msg.type = type;
+	msg.data = data;
+	msg.len = len;
+	return TF_Send(&msg);
+}
+
+// send without listener and struct
+bool _TF_FN TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_LISTENER listener, TF_TICKS timeout)
+{
+	TF_MSG msg;
+	TF_ClearMsg(&msg);
+	msg.type = type;
+	msg.data = data;
+	msg.len = len;
+	return TF_Query(&msg, listener, timeout);
+}
+
+// send with listener
+bool _TF_FN TF_Query(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout)
 {
 	size_t len;
 	len = TF_Compose(tf.sendbuf,
@@ -680,12 +719,12 @@ bool _TF_FN TF_Send(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout)
 }
 
 // Like TF_Send, but with explicit frame ID
-bool _TF_FN TF_Respond(TF_MSG *msg, bool renew)
+bool _TF_FN TF_Respond(TF_MSG *msg)
 {
 	msg->is_response = true;
-	bool suc = TF_Send(msg, NULL, 0);
+	bool suc = TF_Send(msg);
 
-	if (suc && renew) TF_RenewIdListener(msg->frame_id);
+	if (suc && msg->renew) TF_RenewIdListener(msg->frame_id);
 	return suc;
 }
 

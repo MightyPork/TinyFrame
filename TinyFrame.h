@@ -5,70 +5,15 @@
 #include <stdint.h>  // for uint8_t etc
 #include <stdbool.h> // for bool
 #include <stdlib.h>  // for NULL
-//#include "messages.h" // for your message IDs (enum or defines)
-//#include <esp8266.h> // when using with esphttpd
 //---------------------------------------------------------------------------
 
-
-//----------------------------- PARAMETERS ----------------------------------
-
-// Maximum send / receive payload size (static buffers size)
-// Larger payloads will be rejected.
-#define TF_MAX_PAYLOAD_RX 1024
-#define TF_MAX_PAYLOAD_TX 1024
-
-// --- Listener counts - determine sizes of the static slot tables ---
-
-// Frame ID listeners (wait for response / multi-part message)
-#define TF_MAX_ID_LST   10
-// Frame Type listeners (wait for frame with a specific first payload byte)
-#define TF_MAX_TYPE_LST 10
-// Generic listeners (fallback if no other listener catches it)
-#define TF_MAX_GEN_LST  5
-
-// Timeout for receiving & parsing a frame
-// ticks = number of calls to TF_Tick()
-#define TF_PARSER_TIMEOUT_TICKS 10
-
-//----------------------------- FRAME FORMAT ---------------------------------
-// The format can be adjusted to fit your particular application needs
-
-// If the connection is reliable, you can disable the SOF byte and checksums.
-// That can save up to 9 bytes of overhead.
-
-// ,-----+----+-----+------+------------+- - - -+------------,
-// | SOF | ID | LEN | TYPE | HEAD_CKSUM | DATA  | PLD_CKSUM  |
-// | 1   | ?  | ?   | ?    | ?          | ...   | ?          | <- size (bytes)
-// '-----+----+-----+------+------------+- - - -+------------'
-
-// !!! BOTH SIDES MUST USE THE SAME SETTINGS !!!
-
-// Adjust sizes as desired (1,2,4)
-#define TF_ID_BYTES     1
-#define TF_LEN_BYTES    2
-#define TF_TYPE_BYTES   1
-
 // Select checksum type (0 = none, 8 = ~XOR, 16 = CRC16 0x8005, 32 = CRC32)
-#define TF_CKSUM_NONE 0
-#define TF_CKSUM_XOR 8
+#define TF_CKSUM_NONE  0
+#define TF_CKSUM_XOR   8
 #define TF_CKSUM_CRC16 16
 #define TF_CKSUM_CRC32 32
 
-#define TF_CKSUM_TYPE   TF_CKSUM_CRC16
-
-// Use a SOF byte to mark the start of a frame
-#define TF_USE_SOF_BYTE 1
-// Value of the SOF byte (if TF_USE_SOF_BYTE == 1)
-#define TF_SOF_BYTE     0x01
-
-// used for timeout tick counters - should be large enough for all used timeouts
-typedef uint16_t TF_TICKS;
-
-// used in loops iterating over listeners
-typedef uint8_t TF_COUNT;
-
-//------------------------- End of user config ------------------------------
-
+#include <TF_Config.h>
 
 //region Resolve data types
 
@@ -153,6 +98,7 @@ typedef struct _TF_MSG_STRUCT_ {
 	const uint8_t *data;  //!< buffer of received data or data to send. NULL = listener timed out, free userdata!
 	TF_LEN len;           //!< length of the buffer
 	void *userdata;       //!< here's a place for custom data; this data will be stored with the listener
+	bool renew;           //!< Renew the ID listener - if using timeout
 } TF_MSG;
 
 /**
@@ -161,11 +107,12 @@ typedef struct _TF_MSG_STRUCT_ {
 static inline void TF_ClearMsg(TF_MSG *msg)
 {
 	msg->frame_id = 0;
-	msg->is_response = 0;
+	msg->is_response = false;
 	msg->type = 0;
 	msg->data = NULL;
 	msg->len = 0;
 	msg->userdata = NULL;
+	msg->renew = false;
 }
 
 /**
@@ -242,6 +189,24 @@ bool TF_AddGenericListener(TF_LISTENER cb);
 bool TF_RemoveGenericListener(TF_LISTENER cb);
 
 /**
+ * Send a frame, no listener
+ *
+ * @param msg - message struct. ID is stored in the frame_id field
+ * @return success
+ */
+bool TF_Send(TF_MSG *msg);
+
+/**
+ * Like TF_Send, but without the struct
+ */
+bool TF_SendSimple(TF_TYPE type, const uint8_t *data, TF_LEN len);
+
+/**
+ * Like TF_Query, but without the struct
+ */
+bool TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_LISTENER listener, TF_TICKS timeout);
+
+/**
  * Send a frame, and optionally attach an ID listener.
  *
  * @param msg - message struct. ID is stored in the frame_id field
@@ -249,16 +214,15 @@ bool TF_RemoveGenericListener(TF_LISTENER cb);
  * @param timeout - listener expiry time in ticks
  * @return success
  */
-bool TF_Send(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout);
+bool TF_Query(TF_MSG *msg, TF_LISTENER listener, TF_TICKS timeout);
 
 /**
  * Send a response to a received message.
  *
- * @param msg - message struct. ID is read from frame_id
- * @param renew - renew the listener timeout (waiting for more data)
+ * @param msg - message struct. ID is read from frame_id. set ->renew to reset listener timeout
  * @return success
  */
-bool TF_Respond(TF_MSG *msg, bool renew);
+bool TF_Respond(TF_MSG *msg);
 
 /**
  * Renew ID listener timeout
