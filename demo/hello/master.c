@@ -3,9 +3,6 @@
 //
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <zconf.h>
-#include "../../TinyFrame.h"
 #include "../demo.h"
 
 bool testIdListener(TF_MSG *msg)
@@ -34,5 +31,5 @@ int main(void)
 
 	TF_QuerySimple(2, (pu8)"Query!", 6, testIdListener, 0);
 
-	while(1) usleep(10);
+	demo_sleep();
 }

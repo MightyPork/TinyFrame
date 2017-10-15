@@ -18,15 +18,15 @@ void dumpFrame(const uint8_t *buff, size_t len)
 		}
 		printf("\n");
 	}
-	printf("--- end of frame ---\n");
+	printf("--- end of frame ---\n\n");
 }
 
 void dumpFrameInfo(TF_MSG *msg)
 {
-	printf("\033[33mRX frame\n"
+	printf("\033[33mFrame info\n"
 			   "  type: %02Xh\n"
 			   "  data: \"%.*s\"\n"
 			   "   len: %u\n"
-			   "    id: %Xh\033[0m\n",
+			   "    id: %Xh\033[0m\n\n",
 		   msg->type, msg->len, msg->data, msg->len, msg->frame_id);
 }

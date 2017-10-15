@@ -28,9 +28,9 @@ void demo_disconn(void)
 
 void TF_WriteImpl(const uint8_t *buff, size_t len)
 {
-	printf("--------------------\n");
-	printf("\033[32mTF_WriteImpl - sending frame:\033[0m\n");
+	printf("\033[32m--- TX %ld bytes ---\033[0m\n", len);
 	dumpFrame(buff, len);
+	usleep(1000);
 
 	if (sockfd != -1) {
 		write(sockfd, buff, len);
@@ -74,20 +74,10 @@ static int demo_client(void* unused)
 	printf("\n Child Process \n");
 
 	while ((n = read(sockfd, recvBuff, sizeof(recvBuff) - 1)) > 0) {
+		printf("\033[36m--- RX %ld bytes ---\033[0m\n", n);
 		dumpFrame(recvBuff, (size_t) n);
 		TF_Accept(recvBuff, (size_t) n);
 	}
-//	printf("\n End read \n");
-//
-//	if (n < 0) {
-//		printf("\n Read error \n");
-//	}
-//
-//	printf("\n Close sock \n");
-//	close(sockfd);
-//	sockfd = -1;
-//
-//	return true;
 	return 0;
 }
 
@@ -130,7 +120,7 @@ static int demo_server(void* unused)
 		conn_disband = false;
 
 		while ((n = read(sockfd, recvBuff, sizeof(recvBuff) - 1)) > 0 && !conn_disband) {
-			printf("...read %ld\n", n);
+			printf("\033[36m--- RX %ld bytes ---\033[0m\n", n);
 			dumpFrame(recvBuff, n);
 			TF_Accept(recvBuff, (size_t) n);
 		}
@@ -152,6 +142,11 @@ void signal_handler(int sig)
 	printf("Shutting down...");
 	demo_disconn();
 	exit(sig);
+}
+
+void demo_sleep(void)
+{
+	while(1) usleep(10);
 }
 
 void demo_init(TF_PEER peer)

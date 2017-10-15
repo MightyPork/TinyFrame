@@ -3,9 +3,7 @@
 //
 
 #include <stdio.h>
-#include "../../TinyFrame.h"
 #include "../demo.h"
-#include <unistd.h>
 #include <memory.h>
 
 bool helloListener(TF_MSG *msg)
@@ -34,6 +32,5 @@ int main(void)
 	TF_AddTypeListener(2, replyListener);
 
 	demo_init(TF_SLAVE);
-	printf("MAIN PROCESS CONTINUES...\n");
-	while(1) usleep(10);
+	demo_sleep();
 }

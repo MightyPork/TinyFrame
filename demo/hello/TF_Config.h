@@ -10,7 +10,7 @@
 #define TF_ID_BYTES     1
 #define TF_LEN_BYTES    2
 #define TF_TYPE_BYTES   1
-#define TF_CKSUM_TYPE TF_CKSUM_CRC32
+#define TF_CKSUM_TYPE TF_CKSUM_CRC16
 #define TF_USE_SOF_BYTE 1
 #define TF_SOF_BYTE     0x01
 typedef uint16_t TF_TICKS;

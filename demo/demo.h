@@ -11,6 +11,9 @@
 
 #define PORT 9798
 
+/** Sleep and wait for ^C */
+void demo_sleep(void);
+
 /** Init server - DOES NOT init TinyFrame! */
 void demo_init(TF_PEER peer);
 
