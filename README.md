@@ -52,7 +52,7 @@ DATA_CKSUM .. checksum, implemented as XOR of all preceding bytes in the message
 - Start by calling `TF_Init()` with `TF_MASTER` or `TF_SLAVE` as the argument
 - Implement `TF_WriteImpl()` - declared at the bottom of the header file as `extern`.
   This function is used by `TF_Send()` and others to write bytes to your UART (or other physical layer).
-  Presently, always a full frame is sent to this function.
+  A frame can be sent in it's entirety, or in multiple parts, depending on its size.
 - If you wish to use timeouts, periodically call `TF_Tick()`. The calling period determines 
   the length of 1 tick. This is used to time-out the parser in case it gets stuck 
   in a bad state (such as receiving a partial frame) and can also time-out ID listeners.
@@ -83,6 +83,6 @@ keep it, renew it's timeout, or let some other listener handle the message.
 You'll find various examples in the `demo/` folder. Each example has it's own Makefile,
 read it to see what options are available.
 
-The demos are written for Linux, using sockets and `clone()` for background processing.
+The demos are written for Linux, some using sockets and `clone()` for background processing.
 They try to simulate real TinyFrame behavior in an embedded system with asynchronous 
 Rx and Tx. If you can't run the demos, the source files are still good as examples.
