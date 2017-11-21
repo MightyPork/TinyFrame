@@ -509,63 +509,63 @@ void _TF_FN TF_AcceptChar(unsigned char c)
 		case TFState_ID:
 			CKSUM_ADD(tf.cksum, c);
 			COLLECT_NUMBER(tf.id, TF_ID) {
-		// Enter LEN state
-		tf.state = TFState_LEN;
-		tf.rxi = 0;
-	}
+				// Enter LEN state
+				tf.state = TFState_LEN;
+				tf.rxi = 0;
+			}
 			break;
 
 		case TFState_LEN:
 			CKSUM_ADD(tf.cksum, c);
 			COLLECT_NUMBER(tf.len, TF_LEN) {
-		// Enter TYPE state
-		tf.state = TFState_TYPE;
-		tf.rxi = 0;
-	}
+				// Enter TYPE state
+				tf.state = TFState_TYPE;
+				tf.rxi = 0;
+			}
 			break;
 
 		case TFState_TYPE:
 			CKSUM_ADD(tf.cksum, c);
 			COLLECT_NUMBER(tf.type, TF_TYPE) {
 #if TF_CKSUM_TYPE == TF_CKSUM_NONE
-		tf.state = TFState_DATA;
-					tf.rxi = 0;
+				tf.state = TFState_DATA;
+				tf.rxi = 0;
 #else
-		// enter HEAD_CKSUM state
-		tf.state = TFState_HEAD_CKSUM;
-		tf.rxi = 0;
-		tf.ref_cksum = 0;
+				// enter HEAD_CKSUM state
+				tf.state = TFState_HEAD_CKSUM;
+				tf.rxi = 0;
+				tf.ref_cksum = 0;
 #endif
-	}
+			}
 			break;
 
 		case TFState_HEAD_CKSUM:
-		COLLECT_NUMBER(tf.ref_cksum, TF_CKSUM) {
-		// Check the header checksum against the computed value
-		CKSUM_FINALIZE(tf.cksum);
+			COLLECT_NUMBER(tf.ref_cksum, TF_CKSUM) {
+				// Check the header checksum against the computed value
+				CKSUM_FINALIZE(tf.cksum);
 
-		if (tf.cksum != tf.ref_cksum) {
-			TF_ResetParser();
-			break;
-		}
+				if (tf.cksum != tf.ref_cksum) {
+					TF_ResetParser();
+					break;
+				}
 
-		if (tf.len == 0) {
-			TF_HandleReceivedMessage();
-			TF_ResetParser();
-			break;
-		}
+				if (tf.len == 0) {
+					TF_HandleReceivedMessage();
+					TF_ResetParser();
+					break;
+				}
 
-		// Enter DATA state
-		tf.state = TFState_DATA;
-		tf.rxi = 0;
+				// Enter DATA state
+				tf.state = TFState_DATA;
+				tf.rxi = 0;
 
-		CKSUM_RESET(tf.cksum); // Start collecting the payload
+				CKSUM_RESET(tf.cksum); // Start collecting the payload
 
-		if (tf.len >= TF_MAX_PAYLOAD_RX) {
-			// ERROR - frame too long. Consume, but do not store.
-			tf.discard_data = true;
-		}
-	}
+				if (tf.len >= TF_MAX_PAYLOAD_RX) {
+					// ERROR - frame too long. Consume, but do not store.
+					tf.discard_data = true;
+				}
+			}
 			break;
 
 		case TFState_DATA:
@@ -579,8 +579,8 @@ void _TF_FN TF_AcceptChar(unsigned char c)
 			if (tf.rxi == tf.len) {
 #if TF_CKSUM_TYPE == TF_CKSUM_NONE
 				// All done
-					TF_HandleReceivedMessage();
-					TF_ResetParser();
+				TF_HandleReceivedMessage();
+				TF_ResetParser();
 #else
 				// Enter DATA_CKSUM state
 				tf.state = TFState_DATA_CKSUM;
@@ -591,15 +591,15 @@ void _TF_FN TF_AcceptChar(unsigned char c)
 			break;
 
 		case TFState_DATA_CKSUM:
-		COLLECT_NUMBER(tf.ref_cksum, TF_CKSUM) {
-		// Check the header checksum against the computed value
-		CKSUM_FINALIZE(tf.cksum);
-		if (!tf.discard_data && tf.cksum == tf.ref_cksum) {
-			TF_HandleReceivedMessage();
-		}
+			COLLECT_NUMBER(tf.ref_cksum, TF_CKSUM) {
+				// Check the header checksum against the computed value
+				CKSUM_FINALIZE(tf.cksum);
+				if (!tf.discard_data && tf.cksum == tf.ref_cksum) {
+					TF_HandleReceivedMessage();
+				}
 
-		TF_ResetParser();
-	}
+				TF_ResetParser();
+			}
 			break;
 	}
 
