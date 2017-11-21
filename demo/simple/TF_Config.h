@@ -16,7 +16,7 @@
 typedef uint16_t TF_TICKS;
 typedef uint8_t TF_COUNT;
 #define TF_MAX_PAYLOAD_RX 1024
-#define TF_MAX_PAYLOAD_TX 1024
+#define TF_SENDBUF_LEN 1024
 #define TF_MAX_ID_LST   10
 #define TF_MAX_TYPE_LST 10
 #define TF_MAX_GEN_LST  5

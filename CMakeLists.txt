@@ -4,11 +4,13 @@ project(tf)
 set(CMAKE_CXX_STANDARD GNU89)
 
 set(SOURCE_FILES
-        demo/test/test.c
-        demo/test/TF_Config.h
-        demo/hello/master.c
-        demo/hello/slave.c
-        demo/hello/TF_Config.h
+        demo/simple/test.c
+        demo/simple/TF_Config.h
+        demo/socket_demo/master.c
+        demo/socket_demo/slave.c
+        demo/socket_demo/TF_Config.h
+        demo/multipart_tx/test.c
+        demo/multipart_tx/TF_Config.h
         demo/demo.c
         demo/demo.h
         TinyFrame.c
@@ -18,6 +20,6 @@ set(SOURCE_FILES
         demo/utils.h
         )
 
-include_directories(demo/test)
+include_directories(demo/simple)
 
 add_executable(tf ${SOURCE_FILES})
