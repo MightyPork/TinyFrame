@@ -74,17 +74,6 @@
 	#error Bad value for TF_CKSUM_TYPE, must be 8, 16 or 32
 #endif
 
-
-// Bytes added to TF_MAX_PAYLOAD for the send buffer size.
-#define TF_OVERHEAD_BYTES \
-	(1*TF_USE_SOF_BYTE + \
-		sizeof(TF_ID) + \
-		sizeof(TF_LEN) + \
-		sizeof(TF_CKSUM) + \
-		sizeof(TF_TYPE) + \
-		sizeof(TF_CKSUM) \
-	)
-
 //endregion
 
 //---------------------------------------------------------------------------
