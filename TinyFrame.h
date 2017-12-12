@@ -1,6 +1,17 @@
 #ifndef TinyFrameH
 #define TinyFrameH
 
+/**
+ * TinyFrame protocol library
+ * 
+ * version: 1.2.0
+ * 
+ * (c) Ondřej Hruška 2017, MIT License 
+ * no liability/warranty, free for any use, must retain this notice & license
+ * 
+ * Upstream URL: https://github.com/MightyPork/TinyFrame
+ */
+
 //---------------------------------------------------------------------------
 #include <stdint.h>  // for uint8_t etc
 #include <stdbool.h> // for bool
@@ -105,6 +116,7 @@ typedef struct _TF_MSG_STRUCT_ {
 	const uint8_t *data;  //!< buffer of received data or data to send. NULL = listener timed out, free userdata!
 	TF_LEN len;           //!< length of the buffer
 	void *userdata;       //!< here's a place for custom data; this data will be stored with the listener
+	void *userdata2;
 } TF_Msg;
 
 /**
@@ -118,6 +130,7 @@ static inline void TF_ClearMsg(TF_Msg *msg)
 	msg->data = NULL;
 	msg->len = 0;
 	msg->userdata = NULL;
+	msg->userdata2 = NULL;
 }
 
 /**
@@ -268,5 +281,11 @@ extern void TF_WriteImpl(const uint8_t *buff, size_t len);
  * (suggestion - call this in a SysTick handler)
  */
 void TF_Tick(void);
+
+/** Claim the TX interface before composing and sending a frame */
+extern void TF_ClaimTx(void);
+
+/** Free the TX interface after composing and sending a frame */
+extern void TF_ReleaseTx(void);
 
 #endif

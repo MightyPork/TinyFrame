@@ -1,7 +1,6 @@
 //---------------------------------------------------------------------------
 #include "TinyFrame.h"
 #include <string.h>
-//#include "demo/utils.h"
 //---------------------------------------------------------------------------
 
 // Compatibility with ESP8266 SDK
@@ -31,6 +30,7 @@ typedef struct _IdListener_struct_ {
 	TF_TICKS timeout;     // nr of ticks remaining to disable this listener
 	TF_TICKS timeout_max; // the original timeout is stored here
 	void *userdata;
+	void *userdata2;
 } IdListener;
 
 typedef struct _TypeListener_struct_ {
@@ -233,6 +233,7 @@ static void _TF_FN cleanup_id_listener(TF_COUNT i, IdListener *lst)
 	// Make user clean up their data - only if not NULL
 	if (lst->userdata != NULL) {
 		msg.userdata = lst->userdata;
+		msg.userdata2 = lst->userdata2;
 		msg.data = NULL; // this is a signal that the listener should clean up
 		lst->fn(&msg); // return value is ignored here - use TF_STAY or TF_CLOSE
 	}
@@ -281,6 +282,7 @@ bool _TF_FN TF_AddIdListener(TF_Msg *msg, TF_Listener cb, TF_TICKS timeout)
 			lst->fn = cb;
 			lst->id = msg->frame_id;
 			lst->userdata = msg->userdata;
+			lst->userdata2 = msg->userdata2;
 			lst->timeout_max = lst->timeout = timeout;
 			if (i >= tf.count_id_lst) {
 				tf.count_id_lst = (TF_COUNT) (i + 1);
@@ -403,8 +405,10 @@ static void _TF_FN TF_HandleReceivedMessage(void)
 		ilst = &tf.id_listeners[i];
 		if (ilst->fn && ilst->id == msg.frame_id) {
 			msg.userdata = ilst->userdata; // pass userdata pointer to the callback
+			msg.userdata2 = ilst->userdata2;
 			res = ilst->fn(&msg);
 			ilst->userdata = msg.userdata; // put it back (may have changed the pointer or set to NULL)
+			ilst->userdata2 = msg.userdata2; // put it back (may have changed the pointer or set to NULL)
 
 			if (res != TF_NEXT) {
 				if (res == TF_CLOSE) {
@@ -418,6 +422,7 @@ static void _TF_FN TF_HandleReceivedMessage(void)
 		}
 	}
 	msg.userdata = NULL;
+	msg.userdata2 = NULL;
 	// clean up for the following listeners that don't use userdata
 
 	// Type listeners
@@ -734,6 +739,8 @@ static bool _TF_FN TF_SendFrame(TF_Msg *msg, TF_Listener listener, TF_TICKS time
 	size_t sent = 0;
 	TF_CKSUM cksum = 0;
 
+	TF_ClaimTx();
+
 	len = TF_ComposeHead(tf.sendbuf,
 					 &msg->frame_id,
 					 msg->type,
@@ -768,6 +775,8 @@ static bool _TF_FN TF_SendFrame(TF_Msg *msg, TF_Listener listener, TF_TICKS time
 	// Add checksum, flush what remains to be sent
 	len += TF_ComposeTail(tf.sendbuf+len, &cksum);
 	TF_WriteImpl((const uint8_t *) tf.sendbuf, len);
+
+	TF_ReleaseTx();
 
 	return true;
 }
@@ -852,3 +861,12 @@ void _TF_FN TF_Tick(void)
 	}
 }
 
+void __attribute__((weak)) TF_ClaimTx(void)
+{
+	// do nothing
+}
+
+void __attribute__((weak)) TF_ReleaseTx(void)
+{
+	// do nothing
+}
