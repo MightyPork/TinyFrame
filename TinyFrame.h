@@ -91,6 +91,7 @@ typedef enum {
     TF_MASTER = 1,
 } TF_Peer;
 
+/** Response from listeners */
 typedef enum {
     TF_NEXT = 0,   //!< Not handled, let other listeners handle it
     TF_STAY = 1,   //!< Handled, stay
@@ -131,6 +132,8 @@ typedef struct TinyFrame_ TinyFrame;
 typedef TF_Result (*TF_Listener)(TinyFrame *tf, TF_Msg *msg);
 
 // -------------------------------------------------------------------
+
+// region Internal
 
 enum TFState_ {
     TFState_SOF = 0,      //!< Wait for SOF
@@ -207,11 +210,19 @@ struct TinyFrame_ {
     uint8_t sendbuf[TF_SENDBUF_LEN];
 };
 
+// endregion
+
 // -------------------------------------------------------------------
 
 /**
  * Initialize the TinyFrame engine.
- * This can also be used to completely reset it (removing all listeners etc)
+ * This can also be used to completely reset it (removing all listeners etc).
+ *
+ * The field .userdata (or .usertag) can be used to identify different instances
+ * in the TF_WriteImpl() function etc. Set this field after the init.
+ *
+ * This function is a wrapper around TF_InitStatic that calls malloc() to obtain
+ * the instance.
  *
  * @param peer_bit - peer bit to use for self
  */
@@ -220,6 +231,8 @@ TinyFrame *TF_Init(TF_Peer peer_bit);
 
 /**
  * Initialize the TinyFrame engine using a statically allocated instance struct.
+ *
+ * The .userdata / .usertag field is preserved when TF_InitStatic is called.
  *
  * @param peer_bit - peer bit to use for self
  */

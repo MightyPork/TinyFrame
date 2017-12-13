@@ -36,6 +36,7 @@
 
 #elif TF_CKSUM_TYPE == TF_CKSUM_CRC16
 
+// TODO try to replace with an algorithm
 /** CRC table for the CRC-16. The poly is 0x8005 (x^16 + x^15 + x^2 + 1) */
 static const uint16_t crc16_table[256] = {
     0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
@@ -83,6 +84,7 @@ static inline uint16_t crc16_byte(uint16_t cksum, const uint8_t byte)
 
 #elif TF_CKSUM_TYPE == TF_CKSUM_CRC32
 
+// TODO try to replace with an algorithm
 static const uint32_t crc32_table[] = { /* CRC polynomial 0xedb88320 */
     0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
     0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
