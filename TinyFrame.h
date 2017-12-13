@@ -10,7 +10,7 @@
  * Upstream URL: https://github.com/MightyPork/TinyFrame
  */
 
-#define TF_VERSION "1.2.0"
+#define TF_VERSION "2.0.0"
 
 //---------------------------------------------------------------------------
 #include <stdint.h>  // for uint8_t etc
@@ -168,11 +168,8 @@ struct TF_GenericListener_ {
  */
 struct TinyFrame_ {
     /* Public user data */
-    union {
-        // choice between two representations
-        void *userdata;
-        uint32_t usertag;
-    };
+    void *userdata;
+    uint32_t usertag;
 
     // --- the rest of the struct is internal, do not access directly ---
 

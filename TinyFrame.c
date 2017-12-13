@@ -151,8 +151,12 @@ void _TF_FN TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit)
 
     // Zero it out, keeping user config
     uint32_t usertag = tf->usertag;
+    void * userdata = tf->userdata;
+
     memset(tf, 0, sizeof(struct TinyFrame_));
+
     tf->usertag = usertag;
+    tf->userdata = userdata;
 
     tf->peer_bit = peer_bit;
 }
