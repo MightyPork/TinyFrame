@@ -145,8 +145,13 @@ static inline uint32_t crc32_byte(uint32_t cksum, const uint8_t byte)
 /** Init with a user-allocated buffer */
 void _TF_FN TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit)
 {
-    // Zero it out
-    memset(&tf, 0, sizeof(struct TinyFrame_));
+    if (tf == NULL) return;
+
+    // Zero it out, keeping user config
+    uint32_t usertag = tf->usertag;
+    memset(tf, 0, sizeof(struct TinyFrame_));
+    tf->usertag = usertag;
+
     tf->peer_bit = peer_bit;
 }
 
@@ -833,11 +838,15 @@ void _TF_FN TF_Tick(TinyFrame *tf)
 /** Default impl for claiming write mutex; can be specific to the instance */
 void __attribute__((weak)) TF_ClaimTx(TinyFrame *tf)
 {
+    (void) tf;
+
     // do nothing
 }
 
 /** Default impl for releasing write mutex; can be specific to the instance */
 void __attribute__((weak)) TF_ReleaseTx(TinyFrame *tf)
 {
+    (void) tf;
+
     // do nothing
 }
