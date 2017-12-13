@@ -19,6 +19,10 @@ The library lets you register listeners (callback functions) to wait for (1) any
 a particular frame Type, or (3) a specific message ID. This  high-level API lets you 
 easily implement various async communication patterns.
 
+TinyFrame is re-entrant and supports creating multiple instances with the limitation
+that their structure (field sizes and checksum type) must be the same. There is a support
+for adding multi-threaded access to a shared instance using a mutex (via a callback stub).
+
 ## Frame structure
 
 All fields in the message frame have a configurable size (see the top of the header file).
@@ -49,7 +53,9 @@ DATA_CKSUM .. checksum, implemented as XOR of all preceding bytes in the message
 
 - All TinyFrame functions, typedefs and macros start with the `TF_` prefix.
 - Both peers must include the library with the same parameters (configured at the top of the header file)
-- Start by calling `TF_Init()` with `TF_MASTER` or `TF_SLAVE` as the argument
+- Start by calling `TF_Init()` with `TF_MASTER` or `TF_SLAVE` as the argument. This creates a handle.
+  Use `TF_InitStatic()` to avoid the use of malloc(). If multiple instances are used, you can tag them 
+  using the `tf.userdata` / `tf.usertag` field.
 - Implement `TF_WriteImpl()` - declared at the bottom of the header file as `extern`.
   This function is used by `TF_Send()` and others to write bytes to your UART (or other physical layer).
   A frame can be sent in it's entirety, or in multiple parts, depending on its size.

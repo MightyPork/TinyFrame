@@ -11,6 +11,8 @@
 
 #define PORT 9798
 
+extern TinyFrame *demo_tf;
+
 /** Sleep and wait for ^C */
 void demo_sleep(void);
 

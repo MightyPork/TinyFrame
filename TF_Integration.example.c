@@ -10,19 +10,19 @@
  * listener timeout feature.
  */
 
-void TF_WriteImpl(const uint8_t *buff, size_t len)
+void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, size_t len)
 {
     // send to UART
 }
 
 /** Claim the TX interface before composing and sending a frame */
-void TF_ClaimTx(void)
+void TF_ClaimTx(TinyFrame *tf)
 {
     // take mutex
 }
 
 /** Free the TX interface after composing and sending a frame */
-void TF_ReleaseTx(void)
+void TF_ReleaseTx(TinyFrame *tf)
 {
     // release mutex
 }
