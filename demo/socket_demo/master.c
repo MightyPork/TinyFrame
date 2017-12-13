@@ -5,31 +5,31 @@
 #include <stdio.h>
 #include "../demo.h"
 
-TF_Result testIdListener(TF_Msg *msg)
+TF_Result testIdListener(TinyFrame *tf, TF_Msg *msg)
 {
-	printf("testIdListener()\n");
-	dumpFrameInfo(msg);
-	return TF_CLOSE;
+    printf("testIdListener()\n");
+    dumpFrameInfo(msg);
+    return TF_CLOSE;
 }
 
-TF_Result testGenericListener(TF_Msg *msg)
+TF_Result testGenericListener(TinyFrame *tf, TF_Msg *msg)
 {
-	printf("testGenericListener()\n");
-	dumpFrameInfo(msg);
-	return TF_STAY;
+    printf("testGenericListener()\n");
+    dumpFrameInfo(msg);
+    return TF_STAY;
 }
 
 int main(void)
 {
-	TF_Init(TF_MASTER);
-	TF_AddGenericListener(testGenericListener);
+    demo_tf = TF_Init(TF_MASTER);
+    TF_AddGenericListener(demo_tf, testGenericListener);
 
-	demo_init(TF_MASTER);
+    demo_init(TF_MASTER);
 
-	TF_SendSimple(1, (pu8)"Ahoj", 5);
-	TF_SendSimple(1, (pu8)"Hello", 6);
+    TF_SendSimple(demo_tf, 1, (pu8) "Ahoj", 5);
+    TF_SendSimple(demo_tf, 1, (pu8) "Hello", 6);
 
-	TF_QuerySimple(2, (pu8)"Query!", 6, testIdListener, 0, NULL);
+    TF_QuerySimple(demo_tf, 2, (pu8) "Query!", 6, testIdListener, 0);
 
-	demo_sleep();
+    demo_sleep();
 }
