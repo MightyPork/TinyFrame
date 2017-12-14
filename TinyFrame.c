@@ -169,6 +169,13 @@ TinyFrame * _TF_FN TF_Init(TF_Peer peer_bit)
     return tf;
 }
 
+/** Release the struct */
+void TF_DeInit(TinyFrame *tf)
+{
+    if (tf == NULL) return;
+    free(tf);
+}
+
 //region Listeners
 
 /** Reset ID listener's timeout to the original value */
@@ -696,7 +703,7 @@ static size_t _TF_FN TF_ComposeBody(uint8_t *outbuff,
  * @param cksum - checksum variable used for the body
  * @return nr of bytes in outbuff used
  */
-static size_t _TF_FN TF_ComposeTail(uint8_t *outbuff, const TF_CKSUM *cksum)
+static size_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum)
 {
     int8_t si = 0; // signed small int
     uint8_t b = 0;

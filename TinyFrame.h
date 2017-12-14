@@ -10,7 +10,7 @@
  * Upstream URL: https://github.com/MightyPork/TinyFrame
  */
 
-#define TF_VERSION "2.0.0"
+#define TF_VERSION "2.0.1"
 
 //---------------------------------------------------------------------------
 #include <stdint.h>  // for uint8_t etc
@@ -234,6 +234,13 @@ TinyFrame *TF_Init(TF_Peer peer_bit);
  * @param peer_bit - peer bit to use for self
  */
 void TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit);
+
+/**
+ * De-init the dynamically allocated TF instance
+ *
+ * @param tf
+ */
+void TF_DeInit(TinyFrame *tf);
 
 /**
  * Reset the frame parser state machine.
