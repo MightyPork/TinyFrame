@@ -3,14 +3,14 @@
 
 /**
  * TinyFrame protocol library
- * 
- * (c) Ondřej Hruška 2017, MIT License 
+ *
+ * (c) Ondřej Hruška 2017, MIT License
  * no liability/warranty, free for any use, must retain this notice & license
- * 
+ *
  * Upstream URL: https://github.com/MightyPork/TinyFrame
  */
 
-#define TF_VERSION "2.0.1"
+#define TF_VERSION "2.0.2"
 
 //---------------------------------------------------------------------------
 #include <stdint.h>  // for uint8_t etc
