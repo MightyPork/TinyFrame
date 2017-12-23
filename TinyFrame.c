@@ -537,6 +537,7 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
                 }
 
                 if (tf->len == 0) {
+                    // if the message has no body, we're done.
                     TF_HandleReceivedMessage(tf);
                     TF_ResetParser(tf);
                     break;
@@ -773,16 +774,19 @@ static bool _TF_FN TF_SendFrame(TinyFrame *tf, TF_Msg *msg, TF_Listener listener
         }
     }
 
-    // Flush if checksum wouldn't fit in the buffer
-    if (TF_SENDBUF_LEN - len < sizeof(TF_CKSUM)) {
-        TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, len);
-        len = 0;
+    // Checksum only if message had a body
+    if (msg->len > 0) {
+        // Flush if checksum wouldn't fit in the buffer
+        if (TF_SENDBUF_LEN - len < sizeof(TF_CKSUM)) {
+            TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, len);
+            len = 0;
+        }
+
+        // Add checksum, flush what remains to be sent
+        len += TF_ComposeTail(tf->sendbuf + len, &cksum);
     }
 
-    // Add checksum, flush what remains to be sent
-    len += TF_ComposeTail(tf->sendbuf+len, &cksum);
     TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, len);
-
     TF_ReleaseTx(tf);
 
     return true;
