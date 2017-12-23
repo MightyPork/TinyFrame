@@ -549,7 +549,7 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
 
                 CKSUM_RESET(tf->cksum); // Start collecting the payload
 
-                if (tf->len >= TF_MAX_PAYLOAD_RX) {
+                if (tf->len > TF_MAX_PAYLOAD_RX) {
                     // ERROR - frame too long. Consume, but do not store.
                     tf->discard_data = true;
                 }
