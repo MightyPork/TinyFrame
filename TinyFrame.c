@@ -481,10 +481,11 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
 
 #if !TF_USE_SOF_BYTE
     if (tf->state == TFState_SOF) {
-            TF_ParsBeginFrame();
-        }
+        TF_ParsBeginFrame();
+    }
 #endif
 
+    //@formatter:off
     switch (tf->state) {
         case TFState_SOF:
             if (c == TF_SOF_BYTE) {
@@ -513,15 +514,15 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
         case TFState_TYPE:
             CKSUM_ADD(tf->cksum, c);
             COLLECT_NUMBER(tf->type, TF_TYPE) {
-#if TF_CKSUM_TYPE == TF_CKSUM_NONE
-                tf->state = TFState_DATA;
-                tf->rxi = 0;
-#else
-                // enter HEAD_CKSUM state
-                tf->state = TFState_HEAD_CKSUM;
-                tf->rxi = 0;
-                tf->ref_cksum = 0;
-#endif
+                #if TF_CKSUM_TYPE == TF_CKSUM_NONE
+                    tf->state = TFState_DATA;
+                    tf->rxi = 0;
+                #else
+                    // enter HEAD_CKSUM state
+                    tf->state = TFState_HEAD_CKSUM;
+                    tf->rxi = 0;
+                    tf->ref_cksum = 0;
+                #endif
             }
             break;
 
@@ -563,16 +564,16 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
             }
 
             if (tf->rxi == tf->len) {
-#if TF_CKSUM_TYPE == TF_CKSUM_NONE
-                // All done
-                TF_HandleReceivedMessage();
-                TF_ResetParser();
-#else
-                // Enter DATA_CKSUM state
-                tf->state = TFState_DATA_CKSUM;
-                tf->rxi = 0;
-                tf->ref_cksum = 0;
-#endif
+                #if TF_CKSUM_TYPE == TF_CKSUM_NONE
+                    // All done
+                    TF_HandleReceivedMessage();
+                    TF_ResetParser();
+                #else
+                    // Enter DATA_CKSUM state
+                    tf->state = TFState_DATA_CKSUM;
+                    tf->rxi = 0;
+                    tf->ref_cksum = 0;
+                #endif
             }
             break;
 
@@ -588,6 +589,7 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
             }
             break;
     }
+    //@formatter:on
 
     // we get here after finishing HEAD, if no data are to be received - handle and clear
     if (tf->len == 0 && tf->state == TFState_DATA) {
