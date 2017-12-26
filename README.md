@@ -23,6 +23,10 @@ TinyFrame is re-entrant and supports creating multiple instances with the limita
 that their structure (field sizes and checksum type) must be the same. There is a support
 for adding multi-threaded access to a shared instance using a mutex (via a callback stub).
 
+## Ports
+
+A partial port to Python can be found at [MightyPork/PonyFrame](https://github.com/MightyPork/PonyFrame)
+
 ## Frame structure
 
 All fields in the message frame have a configurable size (see the top of the header file).
