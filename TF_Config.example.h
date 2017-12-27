@@ -16,10 +16,10 @@
 // If the connection is reliable, you can disable the SOF byte and checksums.
 // That can save up to 9 bytes of overhead.
 
-// ,-----+----+-----+------+------------+- - - -+------------,
-// | SOF | ID | LEN | TYPE | HEAD_CKSUM | DATA  | PLD_CKSUM  |
-// | 1   | ?  | ?   | ?    | ?          | ...   | ?          | <- size (bytes)
-// '-----+----+-----+------+------------+- - - -+------------'
+// ,-----+-----+-----+------+------------+- - - -+-------------,                
+// | SOF | ID  | LEN | TYPE | HEAD_CKSUM | DATA  | DATA_CKSUM  |                
+// | 0-1 | 1-4 | 1-4 | 1-4  | 0-4        | ...   | 0-4         | <- size (bytes)
+// '-----+-----+-----+------+------------+- - - -+-------------'                
 
 // !!! BOTH PEERS MUST USE THE SAME SETTINGS !!!
 
