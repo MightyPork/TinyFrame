@@ -481,7 +481,7 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
 
 #if !TF_USE_SOF_BYTE
     if (tf->state == TFState_SOF) {
-        TF_ParsBeginFrame();
+        pars_begin_frame();
     }
 #endif
 
@@ -593,6 +593,7 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
     //@formatter:on
 
     // we get here after finishing HEAD, if no data are to be received - handle and clear
+    // TODO verify - this seems unreachable under normal circumstances
     if (tf->len == 0 && tf->state == TFState_DATA) {
         TF_HandleReceivedMessage(tf);
         TF_ResetParser(tf);
