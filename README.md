@@ -42,10 +42,10 @@ length field if your payloads are 20 bytes long, using a 1-byte field (`uint8_t`
 3 bytes. This may be significant if you need high throughput.
 
 ```
-,-----+-----+-----+------+------------+- - - -+-------------,                
-| SOF | ID  | LEN | TYPE | HEAD_CKSUM | DATA  | DATA_CKSUM  |                
+,-----+-----+-----+------+------------+- - - -+-------------,
+| SOF | ID  | LEN | TYPE | HEAD_CKSUM | DATA  | DATA_CKSUM  |
 | 0-1 | 1-4 | 1-4 | 1-4  | 0-4        | ...   | 0-4         | <- size (bytes)
-'-----+-----+-----+------+------------+- - - -+-------------'                
+'-----+-----+-----+------+------------+- - - -+-------------'
 
 SOF ......... start of frame, usually 0x01 (optional, configurable)
 ID  ......... the frame ID (MSb is the peer bit)
@@ -54,7 +54,7 @@ TYPE ........ message type (used to run Type Listeners, pick any values you like
 HEAD_CKSUM .. header checksum
 
 DATA ........ LEN bytes of data (can be 0, in which case DATA_CKSUM is omitted as well)
-DATA_CKSUM .. checksum, implemented as XOR of all preceding bytes in the message
+DATA_CKSUM .. data checksum
 ```
 
 ## Usage Hints
