@@ -1,8 +1,8 @@
 # TinyFrame
 
-TinyFrame is a simple library for building and parsing frames to be sent 
-over a serial interface (e.g. UART, telnet etc.). The code is written 
-to build with `--std=gnu89` and later.
+TinyFrame is a simple library for building and parsing data frames to be sent 
+over a serial interface (e.g. UART, telnet etc.). The code is written to build with 
+`--std=gnu89` and later.
 
 TinyFrame is suitable for a wide range of applications, including inter-microcontroller 
 communication, as a protocol for FTDI-based PC applications or for messaging through
@@ -10,22 +10,25 @@ UDP packets. If you find a good use for it, please let me know so I can add it h
 
 Frames can be protected by a checksum (~XOR, CRC16 or CRC32) and contain 
 a unique ID field which can be used for chaining related messages. The highest bit 
-of the generated IDs is different in each peer to avoid collisions.
+of the generated frame IDs is different in each peer to avoid collisions.
 Peers are functionally equivalent and can send messages to each other 
-(the names "master" and "slave" are used only for convenience and have special meaning 
-in the demos).
+(the names "master" and "slave" are used only for convenience).
 
 The library lets you register listeners (callback functions) to wait for (1) any frame, (2)
-a particular frame Type, or (3) a specific message ID. This  high-level API lets you 
+a particular frame Type, or (3) a specific message ID. This high-level API lets the user 
 easily implement various async communication patterns.
 
 TinyFrame is re-entrant and supports creating multiple instances with the limitation
 that their structure (field sizes and checksum type) must be the same. There is a support
 for adding multi-threaded access to a shared instance using a mutex (via a callback stub).
 
+TinyFrame also comes with (optional) helper functions for building and parsing message
+payloads, those are provided in the `utils/` folder.
+
 ## Ports
 
-A partial port to Python can be found at [MightyPork/PonyFrame](https://github.com/MightyPork/PonyFrame)
+- A partial port to Python can be found at [MightyPork/PonyFrame](https://github.com/MightyPork/PonyFrame).
+- A Rust port is currently in the works.
 
 ## Frame structure
 
@@ -36,20 +39,21 @@ best suit your application needs.
 
 For example, you don't need 4 bytes (`uint32_t`) for the 
 length field if your payloads are 20 bytes long, using a 1-byte field (`uint8_t`) will save
-3 bytes. This may be significant if you high throughput.
+3 bytes. This may be significant if you need high throughput.
 
 ```
-,-----+----+-----+------+------------+- - - -+------------,                
-| SOF | ID | LEN | TYPE | HEAD_CKSUM | DATA  | PLD_CKSUM  |                
-| 1   | ?  | ?   | ?    | ?          | ...   | ?          | <- size (bytes)
-'-----+----+-----+------+------------+- - - -+------------'                
+,-----+-----+-----+------+------------+- - - -+-------------,                
+| SOF | ID  | LEN | TYPE | HEAD_CKSUM | DATA  | DATA_CKSUM  |                
+| 0-1 | 1-4 | 1-4 | 1-4  | 0-4        | ...   | 0-4         | <- size (bytes)
+'-----+-----+-----+------+------------+- - - -+-------------'                
 
-SOF ......... start of frame, 0x01
+SOF ......... start of frame, usually 0x01 (optional, configurable)
 ID  ......... the frame ID (MSb is the peer bit)
-LEN ......... nr of data bytes in the frame
+LEN ......... number of data bytes in the frame
 TYPE ........ message type (used to run Type Listeners, pick any values you like)
 HEAD_CKSUM .. header checksum
-DATA ........ LEN bytes of data
+
+DATA ........ LEN bytes of data (can be 0, in which case DATA_CKSUM is omitted as well)
 DATA_CKSUM .. checksum, implemented as XOR of all preceding bytes in the message
 ```
 
