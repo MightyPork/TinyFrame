@@ -10,7 +10,7 @@
  * Upstream URL: https://github.com/MightyPork/TinyFrame
  */
 
-#define TF_VERSION "2.0.4"
+#define TF_VERSION "2.0.5"
 
 //---------------------------------------------------------------------------
 #include <stdint.h>  // for uint8_t etc
