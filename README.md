@@ -31,7 +31,7 @@ TinyFrame has been ported to mutiple languages:
 
 - The reference C implementation is in this repo
 - Python port - [MightyPork/PonyFrame](https://github.com/MightyPork/PonyFrame)
-- Rust port - [cpsdqs/tinyframe-js](https://github.com/cpsdqs/tinyframe-js)
+- Rust port - [cpsdqs/tinyframe-rs](https://github.com/cpsdqs/tinyframe-rs)
 - JavaScript port - [cpsdqs/tinyframe-js](https://github.com/cpsdqs/tinyframe-js)
 
 Please note most of the ports are experimental and may exhibit various bugs or missing features. Testers are welcome :)
