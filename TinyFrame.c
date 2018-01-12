@@ -243,6 +243,8 @@ bool _TF_FN TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_TICK
             return true;
         }
     }
+
+    TF_Error("Failed to add ID listener");
     return false;
 }
 
@@ -263,6 +265,8 @@ bool _TF_FN TF_AddTypeListener(TinyFrame *tf, TF_TYPE frame_type, TF_Listener cb
             return true;
         }
     }
+
+    TF_Error("Failed to add type listener");
     return false;
 }
 
@@ -282,6 +286,8 @@ bool _TF_FN TF_AddGenericListener(TinyFrame *tf, TF_Listener cb)
             return true;
         }
     }
+
+    TF_Error("Failed to add generic listener");
     return false;
 }
 
@@ -298,6 +304,8 @@ bool _TF_FN TF_RemoveIdListener(TinyFrame *tf, TF_ID frame_id)
             return true;
         }
     }
+
+    TF_Error("ID listener %d to remove not found", (int)frame_id);
     return false;
 }
 
@@ -314,6 +322,8 @@ bool _TF_FN TF_RemoveTypeListener(TinyFrame *tf, TF_TYPE type)
             return true;
         }
     }
+
+    TF_Error("Type listener %d to remove not found", (int)type);
     return false;
 }
 
@@ -330,6 +340,8 @@ bool _TF_FN TF_RemoveGenericListener(TinyFrame *tf, TF_Listener cb)
             return true;
         }
     }
+
+    TF_Error("Generic listener to remove not found");
     return false;
 }
 
@@ -428,6 +440,8 @@ static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf)
             }
         }
     }
+
+    TF_Error("Unhandled message, type %d", (int)msg.type);
 }
 
 //endregion Listeners
@@ -468,7 +482,10 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
 {
     // Parser timeout - clear
     if (tf->parser_timeout_ticks >= TF_PARSER_TIMEOUT_TICKS) {
-        TF_ResetParser(tf);
+        if (tf->state != TFState_SOF) {
+            TF_ResetParser(tf);
+            TF_Error("Parser timeout");
+        }
     }
     tf->parser_timeout_ticks = 0;
 
@@ -481,7 +498,7 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
 
 #if !TF_USE_SOF_BYTE
     if (tf->state == TFState_SOF) {
-        pars_begin_frame();
+        pars_begin_frame(tf);
     }
 #endif
 
@@ -532,6 +549,7 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
                 CKSUM_FINALIZE(tf->cksum);
 
                 if (tf->cksum != tf->ref_cksum) {
+                    TF_Error("Rx head cksum mismatch");
                     TF_ResetParser(tf);
                     break;
                 }
@@ -550,6 +568,7 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
                 CKSUM_RESET(tf->cksum); // Start collecting the payload
 
                 if (tf->len > TF_MAX_PAYLOAD_RX) {
+                    TF_Error("Rx payload too long: %d", (int)tf->len);
                     // ERROR - frame too long. Consume, but do not store.
                     tf->discard_data = true;
                 }
@@ -582,8 +601,12 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
             COLLECT_NUMBER(tf->ref_cksum, TF_CKSUM) {
                 // Check the header checksum against the computed value
                 CKSUM_FINALIZE(tf->cksum);
-                if (!tf->discard_data && tf->cksum == tf->ref_cksum) {
-                    TF_HandleReceivedMessage(tf);
+                if (!tf->discard_data) {
+                    if (tf->cksum == tf->ref_cksum) {
+                        TF_HandleReceivedMessage(tf);
+                    } else {
+                        TF_Error("Body cksum mismatch");
+                    }
                 }
 
                 TF_ResetParser(tf);
@@ -847,6 +870,8 @@ bool _TF_FN TF_RenewIdListener(TinyFrame *tf, TF_ID id)
             return true;
         }
     }
+
+    TF_Error("Renew listener: not found (id %d)", (int)id);
     return false;
 }
 
@@ -867,6 +892,7 @@ void _TF_FN TF_Tick(TinyFrame *tf)
         if (!lst->fn || lst->timeout == 0) continue;
         // count down...
         if (--lst->timeout == 0) {
+            TF_Error("ID listener %d has expired", (int)lst->id);
             // Listener has expired
             cleanup_id_listener(tf, i, lst);
         }

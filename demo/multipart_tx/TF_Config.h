@@ -22,4 +22,6 @@ typedef uint8_t TF_COUNT;
 #define TF_MAX_GEN_LST  5
 #define TF_PARSER_TIMEOUT_TICKS 10
 
+#define TF_Error(format, ...) printf("[TF] " format "\n", ##__VA_ARGS__)
+
 #endif //TF_CONFIG_H

@@ -69,6 +69,9 @@ typedef uint8_t TF_COUNT;
 // ticks = number of calls to TF_Tick()
 #define TF_PARSER_TIMEOUT_TICKS 10
 
+// Error reporting function. To disable debug, change to empty define
+#define TF_Error(format, ...) printf("[TF] " format "\n", ##__VA_ARGS__)
+
 //------------------------- End of user config ------------------------------
 
 #endif //TF_CONFIG_H
