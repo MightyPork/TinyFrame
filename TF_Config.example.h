@@ -8,6 +8,7 @@
 #define TF_CONFIG_H
 
 #include <stdint.h>
+#include <stdio.h> // used by the TF_Error() macro defined below
 //#include <esp8266.h> // when using with esphttpd
 
 //----------------------------- FRAME FORMAT ---------------------------------
@@ -28,11 +29,11 @@
 #define TF_LEN_BYTES    2
 #define TF_TYPE_BYTES   1
 
-// Checksum type
-//#define TF_CKSUM_TYPE TF_CKSUM_NONE
-//#define TF_CKSUM_TYPE TF_CKSUM_XOR
-#define TF_CKSUM_TYPE TF_CKSUM_CRC16
-//#define TF_CKSUM_TYPE TF_CKSUM_CRC32
+// Checksum type. Options:
+//   TF_CKSUM_NONE, TF_CKSUM_XOR, TF_CKSUM_CRC16, TF_CKSUM_CRC32
+//   TF_CKSUM_CUSTOM8, TF_CKSUM_CUSTOM16, TF_CKSUM_CUSTOM32
+// Custom checksums require you to implement checksum functions (see TinyFrame.h)
+#define TF_CKSUM_TYPE TF_CKSUM_CUSTOM8
 
 // Use a SOF byte to mark the start of a frame
 #define TF_USE_SOF_BYTE 1
@@ -54,7 +55,7 @@ typedef uint8_t TF_COUNT;
 #define TF_MAX_PAYLOAD_RX 1024
 // Size of the sending buffer. Larger payloads will be split to pieces and sent
 // in multiple calls to the write function. This can be lowered to reduce RAM usage.
-#define TF_SENDBUF_LEN 128
+#define TF_SENDBUF_LEN    128
 
 // --- Listener counts - determine sizes of the static slot tables ---
 
@@ -68,6 +69,9 @@ typedef uint8_t TF_COUNT;
 // Timeout for receiving & parsing a frame
 // ticks = number of calls to TF_Tick()
 #define TF_PARSER_TIMEOUT_TICKS 10
+
+// Whether to use mutex - requires you to implement TF_ClaimTx() and TF_ReleaseTx()
+#define TF_USE_MUTEX  1
 
 // Error reporting function. To disable debug, change to empty define
 #define TF_Error(format, ...) printf("[TF] " format "\n", ##__VA_ARGS__)

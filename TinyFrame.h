@@ -4,13 +4,13 @@
 /**
  * TinyFrame protocol library
  *
- * (c) Ondřej Hruška 2017, MIT License
+ * (c) Ondřej Hruška 2017-2018, MIT License
  * no liability/warranty, free for any use, must retain this notice & license
  *
  * Upstream URL: https://github.com/MightyPork/TinyFrame
  */
 
-#define TF_VERSION "2.1.0"
+#define TF_VERSION "2.2.0"
 
 //---------------------------------------------------------------------------
 #include <stdint.h>  // for uint8_t etc
@@ -19,11 +19,14 @@
 #include <string.h>  // for memset()
 //---------------------------------------------------------------------------
 
-// Select checksum type (0 = none, 8 = ~XOR, 16 = CRC16 0x8005, 32 = CRC32)
+// Checksum type (0 = none, 8 = ~XOR, 16 = CRC16 0x8005, 32 = CRC32)
 #define TF_CKSUM_NONE  0
 #define TF_CKSUM_XOR   8
 #define TF_CKSUM_CRC16 16
 #define TF_CKSUM_CRC32 32
+#define TF_CKSUM_CUSTOM8 1
+#define TF_CKSUM_CUSTOM16 2
+#define TF_CKSUM_CUSTOM32 3
 
 #include "TF_Config.h"
 
@@ -62,17 +65,17 @@ typedef uint32_t TF_ID;
 #endif
 
 
-#if TF_CKSUM_TYPE == TF_CKSUM_XOR || TF_CKSUM_TYPE == TF_CKSUM_NONE
+#if (TF_CKSUM_TYPE == TF_CKSUM_XOR) || (TF_CKSUM_TYPE == TF_CKSUM_NONE) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM8)
 // ~XOR (if 0, still use 1 byte - it won't be used)
 typedef uint8_t TF_CKSUM;
-#elif TF_CKSUM_TYPE == TF_CKSUM_CRC16
+#elif (TF_CKSUM_TYPE == TF_CKSUM_CRC16) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM16)
 // CRC16
 typedef uint16_t TF_CKSUM;
-#elif TF_CKSUM_TYPE == TF_CKSUM_CRC32
+#elif (TF_CKSUM_TYPE == TF_CKSUM_CRC32) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM32)
 // CRC32
 typedef uint32_t TF_CKSUM;
 #else
-#error Bad value for TF_CKSUM_TYPE, must be 8, 16 or 32
+#error Bad value for TF_CKSUM_TYPE
 #endif
 
 //endregion
@@ -100,7 +103,7 @@ typedef enum {
 } TF_Result;
 
 /** Data structure for sending / receiving messages */
-typedef struct _TF_MSG_STRUCT_ {
+typedef struct TF_Msg_ {
     TF_ID frame_id;       //!< message ID
     bool is_response;     //!< internal flag, set when using the Respond function. frame_id is then kept unchanged.
     TF_TYPE type;         //!< received or sent message type
@@ -135,7 +138,7 @@ typedef TF_Result (*TF_Listener)(TinyFrame *tf, TF_Msg *msg);
 
 // region Internal
 
-enum TFState_ {
+enum TF_State_ {
     TFState_SOF = 0,      //!< Wait for SOF
     TFState_LEN,          //!< Wait for Number Of Bytes
     TFState_HEAD_CKSUM,   //!< Wait for header Checksum
@@ -178,7 +181,7 @@ struct TinyFrame_ {
     TF_ID next_id;          //!< Next frame / frame chain ID
 
     /* Parser state */
-    enum TFState_ state;
+    enum TF_State_ state;
     TF_TICKS parser_timeout_ticks;
     TF_ID id;               //!< Incoming packet ID
     TF_LEN len;             //!< Payload length
@@ -375,10 +378,44 @@ void TF_Tick(TinyFrame *tf);
  */
 extern void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, size_t len);
 
-/** Claim the TX interface before composing and sending a frame */
-extern void TF_ClaimTx(TinyFrame *tf);
+// Mutex functions
+#if TF_USE_MUTEX
 
-/** Free the TX interface after composing and sending a frame */
-extern void TF_ReleaseTx(TinyFrame *tf);
+    /** Claim the TX interface before composing and sending a frame */
+    extern void TF_ClaimTx(TinyFrame *tf);
+
+    /** Free the TX interface after composing and sending a frame */
+    extern void TF_ReleaseTx(TinyFrame *tf);
+
+#endif
+
+// Custom checksum functions
+#if (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM8) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM16) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM32)
+
+    /**
+     * Initialize a checksum
+     *
+     * @return initial checksum value
+     */
+    extern TF_CKSUM TF_CksumStart(void);
+
+    /**
+     * Update a checksum with a byte
+     *
+     * @param cksum - previous checksum value
+     * @param byte - byte to add
+     * @return updated checksum value
+     */
+    extern TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte);
+
+    /**
+     * Finalize the checksum calculation
+     *
+     * @param cksum - previous checksum value
+     * @return final checksum value
+     */
+    extern TF_CKSUM TF_CksumEnd(TF_CKSUM cksum);
+
+#endif
 
 #endif

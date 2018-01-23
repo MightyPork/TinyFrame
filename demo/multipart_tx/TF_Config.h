@@ -6,6 +6,7 @@
 #define TF_CONFIG_H
 
 #include <stdint.h>
+#include <stdio.h>
 
 #define TF_ID_BYTES     1
 #define TF_LEN_BYTES    2
