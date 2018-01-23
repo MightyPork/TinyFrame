@@ -20,13 +20,14 @@
 //---------------------------------------------------------------------------
 
 // Checksum type (0 = none, 8 = ~XOR, 16 = CRC16 0x8005, 32 = CRC32)
-#define TF_CKSUM_NONE  0
-#define TF_CKSUM_XOR   8
-#define TF_CKSUM_CRC16 16
-#define TF_CKSUM_CRC32 32
-#define TF_CKSUM_CUSTOM8 1
-#define TF_CKSUM_CUSTOM16 2
-#define TF_CKSUM_CUSTOM32 3
+#define TF_CKSUM_NONE  0  // no checksums
+#define TF_CKSUM_XOR   8  // inverted xor of all payload bytes
+#define TF_CKSUM_CRC8  9  // Dallas/Maxim CRC8 (1-wire)
+#define TF_CKSUM_CRC16 16 // CRC16 with the polynomial 0x8005 (x^16 + x^15 + x^2 + 1)
+#define TF_CKSUM_CRC32 32 // CRC32 with the polynomial 0xedb88320
+#define TF_CKSUM_CUSTOM8  1  // Custom 8-bit checksum
+#define TF_CKSUM_CUSTOM16 2  // Custom 16-bit checksum
+#define TF_CKSUM_CUSTOM32 3  // Custom 32-bit checksum
 
 #include "TF_Config.h"
 
@@ -65,7 +66,7 @@ typedef uint32_t TF_ID;
 #endif
 
 
-#if (TF_CKSUM_TYPE == TF_CKSUM_XOR) || (TF_CKSUM_TYPE == TF_CKSUM_NONE) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM8)
+#if (TF_CKSUM_TYPE == TF_CKSUM_XOR) || (TF_CKSUM_TYPE == TF_CKSUM_NONE) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM8) || (TF_CKSUM_TYPE == TF_CKSUM_CRC8)
 // ~XOR (if 0, still use 1 byte - it won't be used)
 typedef uint8_t TF_CKSUM;
 #elif (TF_CKSUM_TYPE == TF_CKSUM_CRC16) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM16)
@@ -320,12 +321,14 @@ bool TF_SendSimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len)
  * @param timeout - listener expiry time in ticks
  * @return success
  */
-bool TF_Query(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_TICKS timeout);
+bool TF_Query(TinyFrame *tf, TF_Msg *msg,
+              TF_Listener listener, TF_TICKS timeout);
 
 /**
  * Like TF_Query, but without the struct
  */
-bool TF_QuerySimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len,
+bool TF_QuerySimple(TinyFrame *tf, TF_TYPE type,
+                    const uint8_t *data, TF_LEN len,
                     TF_Listener listener, TF_TICKS timeout);
 
 /**

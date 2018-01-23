@@ -43,6 +43,26 @@
     TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte) { return cksum ^ byte; }
     TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)               { return (TF_CKSUM) ~cksum; }
 
+#elif TF_CKSUM_TYPE == TF_CKSUM_CRC8
+
+    static inline uint8_t crc8_bits(uint8_t data)
+    {
+        uint8_t crc = 0;
+        if(data & 1)     crc ^= 0x5e;
+        if(data & 2)     crc ^= 0xbc;
+        if(data & 4)     crc ^= 0x61;
+        if(data & 8)     crc ^= 0xc2;
+        if(data & 0x10)  crc ^= 0x9d;
+        if(data & 0x20)  crc ^= 0x23;
+        if(data & 0x40)  crc ^= 0x46;
+        if(data & 0x80)  crc ^= 0x8c;
+        return crc;
+    }
+
+    TF_CKSUM TF_CksumStart(void)                       { return 0; }
+    TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte) { return crc8_bits(byte ^ cksum); }
+    TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)               { return cksum; }
+
 #elif TF_CKSUM_TYPE == TF_CKSUM_CRC16
 
     // TODO try to replace with an algorithm

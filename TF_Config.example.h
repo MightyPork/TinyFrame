@@ -30,10 +30,10 @@
 #define TF_TYPE_BYTES   1
 
 // Checksum type. Options:
-//   TF_CKSUM_NONE, TF_CKSUM_XOR, TF_CKSUM_CRC16, TF_CKSUM_CRC32
+//   TF_CKSUM_NONE, TF_CKSUM_XOR, TF_CKSUM_CRC8, TF_CKSUM_CRC16, TF_CKSUM_CRC32
 //   TF_CKSUM_CUSTOM8, TF_CKSUM_CUSTOM16, TF_CKSUM_CUSTOM32
 // Custom checksums require you to implement checksum functions (see TinyFrame.h)
-#define TF_CKSUM_TYPE TF_CKSUM_CUSTOM8
+#define TF_CKSUM_TYPE TF_CKSUM_CRC16
 
 // Use a SOF byte to mark the start of a frame
 #define TF_USE_SOF_BYTE 1
