@@ -27,21 +27,28 @@
 #endif
 
 //region Checksums
-#define CKSUM_RESET(cksum)     do { (cksum) = TF_CksumStart(); } while (0)
-#define CKSUM_ADD(cksum, byte) do { (cksum) = TF_CksumAdd((cksum), (byte)); } while (0)
-#define CKSUM_FINALIZE(cksum)  do { (cksum) = TF_CksumEnd((cksum)); } while (0)
 
 #if TF_CKSUM_TYPE == TF_CKSUM_NONE
 
-    TF_CKSUM TF_CksumStart(void)                       { return 0; }
-    TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte) { return cksum; }
-    TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)               { return cksum; }
+    static TF_CKSUM TF_CksumStart(void)
+      { return 0; }
+
+    static TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte)
+      { return cksum; }
+
+    static TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)
+      { return cksum; }
 
 #elif TF_CKSUM_TYPE == TF_CKSUM_XOR
 
-    TF_CKSUM TF_CksumStart(void)                       { return 0; }
-    TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte) { return cksum ^ byte; }
-    TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)               { return (TF_CKSUM) ~cksum; }
+    static TF_CKSUM TF_CksumStart(void)
+      { return 0; }
+
+    static TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte)
+      { return cksum ^ byte; }
+
+    static TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)
+      { return (TF_CKSUM) ~cksum; }
 
 #elif TF_CKSUM_TYPE == TF_CKSUM_CRC8
 
@@ -59,9 +66,14 @@
         return crc;
     }
 
-    TF_CKSUM TF_CksumStart(void)                       { return 0; }
-    TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte) { return crc8_bits(byte ^ cksum); }
-    TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)               { return cksum; }
+    static TF_CKSUM TF_CksumStart(void)
+      { return 0; }
+
+    static TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte)
+      { return crc8_bits(byte ^ cksum); }
+
+    static TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)
+      { return cksum; }
 
 #elif TF_CKSUM_TYPE == TF_CKSUM_CRC16
 
@@ -102,9 +114,14 @@
         0x8201, 0x42C0, 0x4380, 0x8341, 0x4100, 0x81C1, 0x8081, 0x4040
     };
 
-    TF_CKSUM TF_CksumStart(void)                       { return 0; }
-    TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte) { return (cksum >> 8) ^ crc16_table[(cksum ^ byte) & 0xff]; }
-    TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)               { return cksum; }
+    static TF_CKSUM TF_CksumStart(void)
+      { return 0; }
+
+    static TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte)
+      { return (cksum >> 8) ^ crc16_table[(cksum ^ byte) & 0xff]; }
+
+    static TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)
+      { return cksum; }
 
 #elif TF_CKSUM_TYPE == TF_CKSUM_CRC32
 
@@ -155,11 +172,20 @@
         0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
     };
 
-    TF_CKSUM TF_CksumStart(void)                       { return (TF_CKSUM)0xFFFFFFFF; }
-    TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte) { return crc32_table[((cksum) ^ ((uint8_t)byte)) & 0xff] ^ ((cksum) >> 8); }
-    TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)               { return (TF_CKSUM) ~cksum; }
+    static TF_CKSUM TF_CksumStart(void)
+      { return (TF_CKSUM)0xFFFFFFFF; }
+
+    static TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte)
+      { return crc32_table[((cksum) ^ ((uint8_t)byte)) & 0xff] ^ ((cksum) >> 8); }
+
+    static TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)
+      { return (TF_CKSUM) ~cksum; }
 
 #endif
+
+#define CKSUM_RESET(cksum)     do { (cksum) = TF_CksumStart(); } while (0)
+#define CKSUM_ADD(cksum, byte) do { (cksum) = TF_CksumAdd((cksum), (byte)); } while (0)
+#define CKSUM_FINALIZE(cksum)  do { (cksum) = TF_CksumEnd((cksum)); } while (0)
 
 //endregion
 
