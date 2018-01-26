@@ -37,7 +37,7 @@ features. Testers are welcome :)
 ## Functional overview
 
 The basic functionality of TinyFrame is explained here. For particlars, such as the
-API function, it's recommended to read the doc comments in the header file.
+API functions, it's recommended to read the doc comments in the header file.
 
 ### Structure of a frame
 
