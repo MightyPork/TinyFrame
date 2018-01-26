@@ -14,16 +14,33 @@
 #define TF_MAX(a, b) ((a)>(b)?(a):(b))
 #define TF_MIN(a, b) ((a)<(b)?(a):(b))
 
+#define TF_TRY(func) do { if(!(func)) return false; } while (0)
+
 // TODO It would be nice to have per-instance configurable checksum types, but that would
 // mandate configurable field sizes unless we use u32 everywhere (and possibly shorten
 // it when encoding to the buffer). I don't really like this idea so much. -MP
 
-#if TF_USE_MUTEX==0
+#if !TF_USE_MUTEX
+    // Not thread safe lock implementation, used if user did not provide a better one.
+    // This is less reliable than a real mutex, but will catch most bugs caused by
+    // inappropriate use fo the API.
+
     /** Claim the TX interface before composing and sending a frame */
-    static inline void TF_ClaimTx(TinyFrame *tf) { (void)tf; }
+    static bool TF_ClaimTx(TinyFrame *tf) {
+        if (tf->soft_lock) {
+            TF_Error("TF already locked for tx!");
+            return false;
+        }
+
+        tf->soft_lock = true;
+        return true;
+    }
 
     /** Free the TX interface after composing and sending a frame */
-    static inline void TF_ReleaseTx(TinyFrame *tf) { (void)tf; }
+    static void TF_ReleaseTx(TinyFrame *tf)
+    {
+        tf->soft_lock = false;
+    }
 #endif
 
 //region Checksums
@@ -190,9 +207,12 @@
 //endregion
 
 /** Init with a user-allocated buffer */
-void _TF_FN TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit)
+bool _TF_FN TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit)
 {
-    if (tf == NULL) return;
+    if (tf == NULL) {
+        TF_Error("TF_InitStatic() failed, tf is null.");
+        return false;
+    }
 
     // Zero it out, keeping user config
     uint32_t usertag = tf->usertag;
@@ -204,12 +224,18 @@ void _TF_FN TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit)
     tf->userdata = userdata;
 
     tf->peer_bit = peer_bit;
+    return true;
 }
 
 /** Init with malloc */
 TinyFrame * _TF_FN TF_Init(TF_Peer peer_bit)
 {
     TinyFrame *tf = malloc(sizeof(TinyFrame));
+    if (!tf) {
+        TF_Error("TF_Init() failed, out of memory.");
+        return NULL;
+    }
+
     TF_InitStatic(tf, peer_bit);
     return tf;
 }
@@ -492,9 +518,9 @@ static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf)
 //endregion Listeners
 
 /** Handle a received byte buffer */
-void _TF_FN TF_Accept(TinyFrame *tf, const uint8_t *buffer, size_t count)
+void _TF_FN TF_Accept(TinyFrame *tf, const uint8_t *buffer, uint32_t count)
 {
-    size_t i;
+    uint32_t i;
     for (i = 0; i < count; i++) {
         TF_AcceptChar(tf, buffer[i]);
     }
@@ -714,13 +740,13 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
  * @param msg - message written to the buffer
  * @return nr of bytes in outbuff used by the frame, 0 on failure
  */
-static inline size_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF_Msg *msg)
+static inline uint32_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF_Msg *msg)
 {
     int8_t si = 0; // signed small int
     uint8_t b = 0;
     TF_ID id = 0;
     TF_CKSUM cksum = 0;
-    size_t pos = 0; // can be needed to grow larger than TF_LEN
+    uint32_t pos = 0; // can be needed to grow larger than TF_LEN
 
     (void)cksum;
 
@@ -769,13 +795,13 @@ static inline size_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF_M
  * @param cksum - checksum variable, used for all calls to TF_ComposeBody. Must be reset before first use! (CKSUM_RESET(cksum);)
  * @return nr of bytes in outbuff used
  */
-static size_t _TF_FN TF_ComposeBody(uint8_t *outbuff,
+static uint32_t _TF_FN TF_ComposeBody(uint8_t *outbuff,
                                     const uint8_t *data, TF_LEN data_len,
                                     TF_CKSUM *cksum)
 {
     TF_LEN i = 0;
     uint8_t b = 0;
-    size_t pos = 0;
+    uint32_t pos = 0;
 
     for (i = 0; i < data_len; i++) {
         b = data[i];
@@ -793,17 +819,81 @@ static size_t _TF_FN TF_ComposeBody(uint8_t *outbuff,
  * @param cksum - checksum variable used for the body
  * @return nr of bytes in outbuff used
  */
-static size_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum)
+static uint32_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum)
 {
     int8_t si = 0; // signed small int
     uint8_t b = 0;
-    size_t pos = 0;
+    uint32_t pos = 0;
 
 #if TF_CKSUM_TYPE != TF_CKSUM_NONE
     CKSUM_FINALIZE(*cksum);
     WRITENUM(TF_CKSUM, *cksum);
 #endif
     return pos;
+}
+
+/**
+ * Begin building a frame
+ *
+ * @param tf - instance
+ * @param msg - message to send
+ * @param listener - response listener or NULL
+ * @param timeout - listener timeout ticks, 0 = indefinite
+ * @return success (mutex claimed and listener added, if any)
+ */
+static bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_TICKS timeout)
+{
+    TF_TRY(TF_ClaimTx(tf));
+
+    tf->tx_pos = (uint32_t) TF_ComposeHead(tf, tf->sendbuf, msg); // frame ID is incremented here if it's not a response
+    tf->tx_len = msg->len;
+
+    if (listener) {
+        TF_TRY(TF_AddIdListener(tf, msg, listener, timeout));
+    }
+
+    CKSUM_RESET(tf->tx_cksum);
+    return true;
+}
+
+static void _TF_FN TF_SendFrame_Chunk(TinyFrame *tf, const uint8_t *buff, uint32_t length)
+{
+    uint32_t remain;
+    uint32_t chunk;
+    uint32_t sent = 0;
+
+    remain = length;
+    while (remain > 0) {
+        // Write what can fit in the tx buffer
+        chunk = TF_MIN(TF_SENDBUF_LEN - tf->tx_pos, remain);
+        tf->tx_pos += TF_ComposeBody(tf->sendbuf+tf->tx_pos, buff+sent, (TF_LEN) chunk, &tf->tx_cksum);
+        remain -= chunk;
+        sent += chunk;
+
+        // Flush if the buffer is full
+        if (tf->tx_pos == TF_SENDBUF_LEN) {
+            TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
+            tf->tx_pos = 0;
+        }
+    }
+}
+
+static void _TF_FN TF_SendFrame_End(TinyFrame *tf)
+{
+    // Checksum only if message had a body
+    if (tf->tx_len > 0) {
+        // Flush if checksum wouldn't fit in the buffer
+        if (TF_SENDBUF_LEN - tf->tx_pos < sizeof(TF_CKSUM)) {
+            TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
+            tf->tx_pos = 0;
+        }
+
+        // Add checksum, flush what remains to be sent
+        tf->tx_pos += TF_ComposeTail(tf->sendbuf + tf->tx_pos, &tf->tx_cksum);
+    }
+
+    TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
+    TF_ReleaseTx(tf);
 }
 
 /**
@@ -817,47 +907,9 @@ static size_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum)
  */
 static bool _TF_FN TF_SendFrame(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_TICKS timeout)
 {
-    size_t len = 0;
-    size_t remain = 0;
-    size_t sent = 0;
-    TF_CKSUM cksum = 0;
-
-    TF_ClaimTx(tf);
-
-    len = TF_ComposeHead(tf, tf->sendbuf, msg);
-    if (listener) TF_AddIdListener(tf, msg, listener, timeout);
-
-    CKSUM_RESET(cksum);
-
-    remain = msg->len;
-    while (remain > 0) {
-        size_t chunk = TF_MIN(TF_SENDBUF_LEN - len, remain);
-        len += TF_ComposeBody(tf->sendbuf+len, msg->data+sent, (TF_LEN) chunk, &cksum);
-        remain -= chunk;
-        sent += chunk;
-
-        // Flush if the buffer is full and we have more to send
-        if (remain > 0 && len == TF_SENDBUF_LEN) {
-            TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, len);
-            len = 0;
-        }
-    }
-
-    // Checksum only if message had a body
-    if (msg->len > 0) {
-        // Flush if checksum wouldn't fit in the buffer
-        if (TF_SENDBUF_LEN - len < sizeof(TF_CKSUM)) {
-            TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, len);
-            len = 0;
-        }
-
-        // Add checksum, flush what remains to be sent
-        len += TF_ComposeTail(tf->sendbuf + len, &cksum);
-    }
-
-    TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, len);
-    TF_ReleaseTx(tf);
-
+    TF_TRY(TF_SendFrame_Begin(tf, msg, listener, timeout));
+    TF_SendFrame_Chunk(tf, msg->data, msg->len);
+    TF_SendFrame_End(tf);
     return true;
 }
 
@@ -923,7 +975,7 @@ bool _TF_FN TF_RenewIdListener(TinyFrame *tf, TF_ID id)
 /** Timebase hook - for timeouts */
 void _TF_FN TF_Tick(TinyFrame *tf)
 {
-    TF_COUNT i = 0;
+    TF_COUNT i;
     struct TF_IdListener_ *lst;
 
     // increment parser timeout (timeout is handled when receiving next byte)

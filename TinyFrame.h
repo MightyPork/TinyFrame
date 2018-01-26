@@ -193,6 +193,15 @@ struct TinyFrame_ {
     TF_TYPE type;           //!< Collected message type number
     bool discard_data;      //!< Set if (len > TF_MAX_PAYLOAD) to read the frame, but ignore the data.
 
+    /* Tx state */
+    uint32_t tx_pos;
+    uint32_t tx_len;
+    TF_CKSUM tx_cksum;
+
+#if !TF_USE_MUTEX
+    bool soft_lock;         //!< Lock used if the mutex feature is not enabled.
+#endif
+
     /* --- Callbacks --- */
 
     /* Transaction callbacks */
@@ -226,6 +235,7 @@ struct TinyFrame_ {
  * the instance.
  *
  * @param peer_bit - peer bit to use for self
+ * @return TF instance or NULL
  */
 TinyFrame *TF_Init(TF_Peer peer_bit);
 
@@ -236,8 +246,9 @@ TinyFrame *TF_Init(TF_Peer peer_bit);
  * The .userdata / .usertag field is preserved when TF_InitStatic is called.
  *
  * @param peer_bit - peer bit to use for self
+ * @return success
  */
-void TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit);
+bool TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit);
 
 /**
  * De-init the dynamically allocated TF instance
@@ -353,7 +364,7 @@ bool TF_RenewIdListener(TinyFrame *tf, TF_ID id);
  * @param buffer - byte buffer to process
  * @param count - nr of bytes in the buffer
  */
-void TF_Accept(TinyFrame *tf, const uint8_t *buffer, size_t count);
+void TF_Accept(TinyFrame *tf, const uint8_t *buffer, uint32_t count);
 
 /**
  * Accept a single incoming byte
@@ -364,11 +375,11 @@ void TF_AcceptChar(TinyFrame *tf, uint8_t c);
 
 /**
  * This function should be called periodically.
- *
  * The time base is used to time-out partial frames in the parser and
  * automatically reset it.
+ * It's also used to expire ID listeners if a timeout is set when registering them.
  *
- * (suggestion - call this in a SysTick handler)
+ * A common place to call this from is the SysTick handler.
  */
 void TF_Tick(TinyFrame *tf);
 
@@ -379,13 +390,13 @@ void TF_Tick(TinyFrame *tf);
  *
  * ! Implement this in your application code !
  */
-extern void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, size_t len);
+extern void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len);
 
 // Mutex functions
 #if TF_USE_MUTEX
 
     /** Claim the TX interface before composing and sending a frame */
-    extern void TF_ClaimTx(TinyFrame *tf);
+    extern bool TF_ClaimTx(TinyFrame *tf);
 
     /** Free the TX interface after composing and sending a frame */
     extern void TF_ReleaseTx(TinyFrame *tf);

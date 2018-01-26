@@ -5,18 +5,27 @@
 
 TinyFrame *demo_tf;
 
+bool do_corrupt = false;
+
 /**
  * This function should be defined in the application code.
  * It implements the lowest layer - sending bytes to UART (or other)
  */
-void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, size_t len)
+void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
 {
     printf("--------------------\n");
     printf("\033[32mTF_WriteImpl - sending frame:\033[0m\n");
-    dumpFrame(buff, len);
+    
+    uint8_t *xbuff = (uint8_t *)buff;    
+    if (do_corrupt) {
+      printf("(corrupting to test checksum checking...)\n");
+      xbuff[8]++;
+    }
+    
+    dumpFrame(xbuff, len);
 
     // Send it back as if we received it
-    TF_Accept(tf, buff, len);
+    TF_Accept(tf, xbuff, len);
 }
 
 /** An example listener function */
@@ -63,4 +72,13 @@ void main(void)
     msg.len = 0;
     msg.type = 0x77;
     TF_Query(demo_tf, &msg, testIdListener, 0);
+    
+    printf("This should fail:\n");
+    
+    // test checksums are tested
+    do_corrupt = true;    
+    msg.type = 0x44;
+    msg.data = (pu8) "Hello2";
+    msg.len = 7;
+    TF_Send(demo_tf, &msg);
 }
