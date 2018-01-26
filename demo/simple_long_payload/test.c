@@ -24,6 +24,7 @@ void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
 /** An example listener function */
 TF_Result myListener(TinyFrame *tf, TF_Msg *msg)
 {
+    (void)tf;
     dumpFrameInfo(msg);
     if (strcmp((const char *) msg->data, romeo) == 0) {
         printf("FILE TRANSFERRED OK!\r\n");

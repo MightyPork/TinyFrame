@@ -10,13 +10,16 @@
 #define _TF_FN
 #endif
 
+
 // Helper macros
 #define TF_MIN(a, b) ((a)<(b)?(a):(b))
 #define TF_TRY(func) do { if(!(func)) return false; } while (0)
 
-// TODO It would be nice to have per-instance configurable checksum types, but that would
-// mandate configurable field sizes unless we use u32 everywhere (and possibly shorten
-// it when encoding to the buffer). I don't really like this idea so much. -MP
+
+// Type-dependent masks for bit manipulation in the ID field
+#define TF_ID_MASK (TF_ID)(((TF_ID)1 << (sizeof(TF_ID)*8 - 1)) - 1)
+#define TF_ID_PEERBIT (TF_ID)((TF_ID)1 << ((sizeof(TF_ID)*8) - 1))
+
 
 #if !TF_USE_MUTEX
     // Not thread safe lock implementation, used if user did not provide a better one.
@@ -513,7 +516,28 @@ static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf)
     TF_Error("Unhandled message, type %d", (int)msg.type);
 }
 
+/** Externally renew an ID listener */
+bool _TF_FN TF_RenewIdListener(TinyFrame *tf, TF_ID id)
+{
+    TF_COUNT i;
+    struct TF_IdListener_ *lst;
+    for (i = 0; i < tf->count_id_lst; i++) {
+        lst = &tf->id_listeners[i];
+        // test if live & matching
+        if (lst->fn != NULL && lst->id == id) {
+            renew_id_listener(lst);
+            return true;
+        }
+    }
+
+    TF_Error("Renew listener: not found (id %d)", (int)id);
+    return false;
+}
+
 //endregion Listeners
+
+
+//region Parser
 
 /** Handle a received byte buffer */
 void _TF_FN TF_Accept(TinyFrame *tf, const uint8_t *buffer, uint32_t count)
@@ -685,8 +709,14 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
     //@formatter:on
 }
 
+//endregion Parser
+
+
+//region Compose and send
+
 // Helper macros for the Compose functions
 // use variables: si - signed int, b - byte, outbuff - target buffer, pos - count of bytes in buffer
+
 
 /**
  * Write a number to the output buffer.
@@ -737,9 +767,9 @@ static inline uint32_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF
     uint8_t b = 0;
     TF_ID id = 0;
     TF_CKSUM cksum = 0;
-    uint32_t pos = 0; // can be needed to grow larger than TF_LEN
+    uint32_t pos = 0;
 
-    (void)cksum;
+    (void)cksum; // suppress "unused" warning if checksums are disabled
 
     CKSUM_RESET(cksum);
 
@@ -786,7 +816,7 @@ static inline uint32_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF
  * @param cksum - checksum variable, used for all calls to TF_ComposeBody. Must be reset before first use! (CKSUM_RESET(cksum);)
  * @return nr of bytes in outbuff used
  */
-static uint32_t _TF_FN TF_ComposeBody(uint8_t *outbuff,
+static inline uint32_t _TF_FN TF_ComposeBody(uint8_t *outbuff,
                                     const uint8_t *data, TF_LEN data_len,
                                     TF_CKSUM *cksum)
 {
@@ -810,7 +840,7 @@ static uint32_t _TF_FN TF_ComposeBody(uint8_t *outbuff,
  * @param cksum - checksum variable used for the body
  * @return nr of bytes in outbuff used
  */
-static uint32_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum)
+static inline uint32_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum)
 {
     int8_t si = 0; // signed small int
     uint8_t b = 0;
@@ -824,7 +854,7 @@ static uint32_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum)
 }
 
 /**
- * Begin building a frame
+ * Begin building and sending a frame
  *
  * @param tf - instance
  * @param msg - message to send
@@ -847,6 +877,14 @@ static bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TF_Msg *msg, TF_Listener li
     return true;
 }
 
+/**
+ * Build and send a part (or all) of a frame body.
+ * Caution: this does not check the total length against the length specified in the frame head
+ *
+ * @param tf - instance
+ * @param buff - bytes to write
+ * @param length - count
+ */
 static void _TF_FN TF_SendFrame_Chunk(TinyFrame *tf, const uint8_t *buff, uint32_t length)
 {
     uint32_t remain;
@@ -869,6 +907,11 @@ static void _TF_FN TF_SendFrame_Chunk(TinyFrame *tf, const uint8_t *buff, uint32
     }
 }
 
+/**
+ * End a multi-part frame. This sends the checksum and releases mutex.
+ *
+ * @param tf - instance
+ */
 static void _TF_FN TF_SendFrame_End(TinyFrame *tf)
 {
     // Checksum only if message had a body
@@ -899,10 +942,20 @@ static void _TF_FN TF_SendFrame_End(TinyFrame *tf)
 static bool _TF_FN TF_SendFrame(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_TICKS timeout)
 {
     TF_TRY(TF_SendFrame_Begin(tf, msg, listener, timeout));
-    TF_SendFrame_Chunk(tf, msg->data, msg->len);
-    TF_SendFrame_End(tf);
+    if (msg->len == 0 || msg->data != NULL) {
+        // Send the payload and checksum only if we're not starting a multi-part frame.
+        // A multi-part frame is identified by passing NULL to the data field and setting the length.
+        // User then needs to call those functions manually
+        TF_SendFrame_Chunk(tf, msg->data, msg->len);
+        TF_SendFrame_End(tf);
+    }
     return true;
 }
+
+//endregion Compose and send
+
+
+//region Sending API funcs
 
 /** send without listener */
 bool _TF_FN TF_Send(TinyFrame *tf, TF_Msg *msg)
@@ -945,23 +998,51 @@ bool _TF_FN TF_Respond(TinyFrame *tf, TF_Msg *msg)
     return TF_Send(tf, msg);
 }
 
-/** Externally renew an ID listener */
-bool _TF_FN TF_RenewIdListener(TinyFrame *tf, TF_ID id)
-{
-    TF_COUNT i;
-    struct TF_IdListener_ *lst;
-    for (i = 0; i < tf->count_id_lst; i++) {
-        lst = &tf->id_listeners[i];
-        // test if live & matching
-        if (lst->fn != NULL && lst->id == id) {
-            renew_id_listener(lst);
-            return true;
-        }
-    }
+//endregion Sending API funcs
 
-    TF_Error("Renew listener: not found (id %d)", (int)id);
-    return false;
+
+//region Sending API funcs - multipart
+
+bool _TF_FN TF_Send_Multipart(TinyFrame *tf, TF_Msg *msg)
+{
+    msg->data = NULL;
+    return TF_Send(tf, msg);
 }
+
+bool _TF_FN TF_SendSimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len)
+{
+    return TF_SendSimple(tf, type, NULL, len);
+}
+
+bool _TF_FN TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TF_Listener listener, TF_TICKS timeout)
+{
+    return TF_QuerySimple(tf, type, NULL, len, listener, timeout);
+}
+
+bool _TF_FN TF_Query_Multipart(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_TICKS timeout)
+{
+    msg->data = NULL;
+    return TF_Query(tf, msg, listener, timeout);
+}
+
+void _TF_FN TF_Respond_Multipart(TinyFrame *tf, TF_Msg *msg)
+{
+    msg->data = NULL;
+    TF_Respond(tf, msg);
+}
+
+void _TF_FN TF_Multipart_Payload(TinyFrame *tf, const uint8_t *buff, uint32_t length)
+{
+    TF_SendFrame_Chunk(tf, buff, length);
+}
+
+void _TF_FN TF_Multipart_Close(TinyFrame *tf)
+{
+    TF_SendFrame_End(tf);
+}
+
+//endregion Sending API funcs - multipart
+
 
 /** Timebase hook - for timeouts */
 void _TF_FN TF_Tick(TinyFrame *tf)

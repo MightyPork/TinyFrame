@@ -34,58 +34,52 @@
 //region Resolve data types
 
 #if TF_LEN_BYTES == 1
-typedef uint8_t TF_LEN;
+    typedef uint8_t TF_LEN;
 #elif TF_LEN_BYTES == 2
-typedef uint16_t TF_LEN;
+    typedef uint16_t TF_LEN;
 #elif TF_LEN_BYTES == 4
-typedef uint32_t TF_LEN;
+    typedef uint32_t TF_LEN;
 #else
-#error Bad value of TF_LEN_BYTES, must be 1, 2 or 4
+    #error Bad value of TF_LEN_BYTES, must be 1, 2 or 4
 #endif
 
 
 #if TF_TYPE_BYTES == 1
-typedef uint8_t TF_TYPE;
+    typedef uint8_t TF_TYPE;
 #elif TF_TYPE_BYTES == 2
-typedef uint16_t TF_TYPE;
+    typedef uint16_t TF_TYPE;
 #elif TF_TYPE_BYTES == 4
-typedef uint32_t TF_TYPE;
+    typedef uint32_t TF_TYPE;
 #else
-#error Bad value of TF_TYPE_BYTES, must be 1, 2 or 4
+    #error Bad value of TF_TYPE_BYTES, must be 1, 2 or 4
 #endif
 
 
 #if TF_ID_BYTES == 1
-typedef uint8_t TF_ID;
+    typedef uint8_t TF_ID;
 #elif TF_ID_BYTES == 2
-typedef uint16_t TF_ID;
+    typedef uint16_t TF_ID;
 #elif TF_ID_BYTES == 4
-typedef uint32_t TF_ID;
+    typedef uint32_t TF_ID;
 #else
-#error Bad value of TF_ID_BYTES, must be 1, 2 or 4
+    #error Bad value of TF_ID_BYTES, must be 1, 2 or 4
 #endif
 
 
 #if (TF_CKSUM_TYPE == TF_CKSUM_XOR) || (TF_CKSUM_TYPE == TF_CKSUM_NONE) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM8) || (TF_CKSUM_TYPE == TF_CKSUM_CRC8)
-// ~XOR (if 0, still use 1 byte - it won't be used)
-typedef uint8_t TF_CKSUM;
+    // ~XOR (if 0, still use 1 byte - it won't be used)
+    typedef uint8_t TF_CKSUM;
 #elif (TF_CKSUM_TYPE == TF_CKSUM_CRC16) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM16)
-// CRC16
-typedef uint16_t TF_CKSUM;
+    // CRC16
+    typedef uint16_t TF_CKSUM;
 #elif (TF_CKSUM_TYPE == TF_CKSUM_CRC32) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM32)
-// CRC32
-typedef uint32_t TF_CKSUM;
+    // CRC32
+    typedef uint32_t TF_CKSUM;
 #else
-#error Bad value for TF_CKSUM_TYPE
+    #error Bad value for TF_CKSUM_TYPE
 #endif
 
 //endregion
-
-//---------------------------------------------------------------------------
-
-// Type-dependent masks for bit manipulation in the ID field
-#define TF_ID_MASK (TF_ID)(((TF_ID)1 << (sizeof(TF_ID)*8 - 1)) - 1)
-#define TF_ID_PEERBIT (TF_ID)((TF_ID)1 << ((sizeof(TF_ID)*8) - 1))
 
 //---------------------------------------------------------------------------
 
@@ -95,6 +89,7 @@ typedef enum {
     TF_MASTER = 1,
 } TF_Peer;
 
+
 /** Response from listeners */
 typedef enum {
     TF_NEXT = 0,   //!< Not handled, let other listeners handle it
@@ -103,41 +98,299 @@ typedef enum {
     TF_CLOSE = 3,  //!< Handled, remove self
 } TF_Result;
 
+
 /** Data structure for sending / receiving messages */
 typedef struct TF_Msg_ {
     TF_ID frame_id;       //!< message ID
     bool is_response;     //!< internal flag, set when using the Respond function. frame_id is then kept unchanged.
     TF_TYPE type;         //!< received or sent message type
-    const uint8_t *data;  //!< buffer of received data or data to send. NULL = listener timed out, free userdata!
-    TF_LEN len;           //!< length of the buffer
-    void *userdata;       //!< here's a place for custom data; this data will be stored with the listener
+
+    /**
+     * Buffer of received data, or data to send.
+     *
+     * - If (data == NULL) in an ID listener, that means the listener timed out and
+     *   the user should free any userdata and take other appropriate actions.
+     *
+     * - If (data == NULL) and length is not zero when sending a frame, that starts a multi-part frame.
+     *   This call then must be followed by sending the payload and closing the frame.
+     */
+    const uint8_t *data;
+    TF_LEN len; //!< length of the payload
+
+    /**
+     * Custom user data for the ID listener.
+     *
+     * This data will be stored in the listener slot and passed to the ID callback
+     * via those same fields on the received message.
+     */
+    void *userdata;
     void *userdata2;
 } TF_Msg;
 
 /**
  * Clear message struct
+ *
+ * @param msg - message to clear in-place
  */
 static inline void TF_ClearMsg(TF_Msg *msg)
 {
     memset(msg, 0, sizeof(TF_Msg));
 }
 
+/** TinyFrame struct typedef */
 typedef struct TinyFrame_ TinyFrame;
 
 /**
  * TinyFrame Type Listener callback
  *
- * @param frame_id - ID of the received frame
- * @param type - type field from the message
- * @param data - byte buffer with the application data
- * @param len - number of bytes in the buffer
+ * @param tf - instance
+ * @param msg - the received message, userdata is populated inside the object
  * @return listener result
  */
 typedef TF_Result (*TF_Listener)(TinyFrame *tf, TF_Msg *msg);
 
-// -------------------------------------------------------------------
 
-// region Internal
+// ---------------------------------- INIT ------------------------------
+
+/**
+ * Initialize the TinyFrame engine.
+ * This can also be used to completely reset it (removing all listeners etc).
+ *
+ * The field .userdata (or .usertag) can be used to identify different instances
+ * in the TF_WriteImpl() function etc. Set this field after the init.
+ *
+ * This function is a wrapper around TF_InitStatic that calls malloc() to obtain
+ * the instance.
+ *
+ * @param tf - instance
+ * @param peer_bit - peer bit to use for self
+ * @return TF instance or NULL
+ */
+TinyFrame *TF_Init(TF_Peer peer_bit);
+
+
+/**
+ * Initialize the TinyFrame engine using a statically allocated instance struct.
+ *
+ * The .userdata / .usertag field is preserved when TF_InitStatic is called.
+ *
+ * @param tf - instance
+ * @param peer_bit - peer bit to use for self
+ * @return success
+ */
+bool TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit);
+
+/**
+ * De-init the dynamically allocated TF instance
+ *
+ * @param tf - instance
+ */
+void TF_DeInit(TinyFrame *tf);
+
+
+// ---------------------------------- API CALLS --------------------------------------
+
+/**
+ * Accept incoming bytes & parse frames
+ *
+ * @param tf - instance
+ * @param buffer - byte buffer to process
+ * @param count - nr of bytes in the buffer
+ */
+void TF_Accept(TinyFrame *tf, const uint8_t *buffer, uint32_t count);
+
+/**
+ * Accept a single incoming byte
+ *
+ * @param tf - instance
+ * @param c - a received char
+ */
+void TF_AcceptChar(TinyFrame *tf, uint8_t c);
+
+/**
+ * This function should be called periodically.
+ * The time base is used to time-out partial frames in the parser and
+ * automatically reset it.
+ * It's also used to expire ID listeners if a timeout is set when registering them.
+ *
+ * A common place to call this from is the SysTick handler.
+ *
+ * @param tf - instance
+ */
+void TF_Tick(TinyFrame *tf);
+
+/**
+ * Reset the frame parser state machine.
+ * This does not affect registered listeners.
+ *
+ * @param tf - instance
+ */
+void TF_ResetParser(TinyFrame *tf);
+
+
+// ---------------------------- MESSAGE LISTENERS -------------------------------
+
+/**
+ * Register a frame type listener.
+ *
+ * @param tf - instance
+ * @param msg - message (contains frame_id and userdata)
+ * @param cb - callback
+ * @param timeout - timeout in ticks to auto-remove the listener (0 = keep forever)
+ * @return slot index (for removing), or TF_ERROR (-1)
+ */
+bool TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_TICKS timeout);
+
+/**
+ * Remove a listener by the message ID it's registered for
+ *
+ * @param tf - instance
+ * @param frame_id - the frame we're listening for
+ */
+bool TF_RemoveIdListener(TinyFrame *tf, TF_ID frame_id);
+
+/**
+ * Register a frame type listener.
+ *
+ * @param tf - instance
+ * @param frame_type - frame type to listen for
+ * @param cb - callback
+ * @return slot index (for removing), or TF_ERROR (-1)
+ */
+bool TF_AddTypeListener(TinyFrame *tf, TF_TYPE frame_type, TF_Listener cb);
+
+/**
+ * Remove a listener by type.
+ *
+ * @param tf - instance
+ * @param type - the type it's registered for
+ */
+bool TF_RemoveTypeListener(TinyFrame *tf, TF_TYPE type);
+
+/**
+ * Register a generic listener.
+ *
+ * @param tf - instance
+ * @param cb - callback
+ * @return slot index (for removing), or TF_ERROR (-1)
+ */
+bool TF_AddGenericListener(TinyFrame *tf, TF_Listener cb);
+
+/**
+ * Remove a generic listener by function pointer
+ *
+ * @param tf - instance
+ * @param cb - callback function to remove
+ */
+bool TF_RemoveGenericListener(TinyFrame *tf, TF_Listener cb);
+
+/**
+ * Renew an ID listener timeout externally (as opposed to by returning TF_RENEW from the ID listener)
+ *
+ * @param tf - instance
+ * @param id - listener ID to renew
+ * @return true if listener was found and renewed
+ */
+bool TF_RenewIdListener(TinyFrame *tf, TF_ID id);
+
+
+// ---------------------------- FRAME TX FUNCTIONS ------------------------------
+
+/**
+ * Send a frame, no listener
+ *
+ * @param tf - instance
+ * @param msg - message struct. ID is stored in the frame_id field
+ * @return success
+ */
+bool TF_Send(TinyFrame *tf, TF_Msg *msg);
+
+/**
+ * Like TF_Send, but without the struct
+ */
+bool TF_SendSimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len);
+
+/**
+ * Send a frame, and optionally attach an ID listener.
+ *
+ * @param tf - instance
+ * @param msg - message struct. ID is stored in the frame_id field
+ * @param listener - listener waiting for the response (can be NULL)
+ * @param timeout - listener expiry time in ticks
+ * @return success
+ */
+bool TF_Query(TinyFrame *tf, TF_Msg *msg,
+              TF_Listener listener, TF_TICKS timeout);
+
+/**
+ * Like TF_Query(), but without the struct
+ */
+bool TF_QuerySimple(TinyFrame *tf, TF_TYPE type,
+                    const uint8_t *data, TF_LEN len,
+                    TF_Listener listener, TF_TICKS timeout);
+
+/**
+ * Send a response to a received message.
+ *
+ * @param tf - instance
+ * @param msg - message struct. ID is read from frame_id. set ->renew to reset listener timeout
+ * @return success
+ */
+bool TF_Respond(TinyFrame *tf, TF_Msg *msg);
+
+
+// ------------------------ MULTIPART FRAME TX FUNCTIONS -----------------------------
+// Those routines are used to send long frames without having all the data available
+// at once (e.g. capturing it from a peripheral or reading from a large memory buffer)
+
+/**
+ * TF_Send() with multipart payload.
+ * msg.data is ignored and set to NULL
+ */
+bool TF_Send_Multipart(TinyFrame *tf, TF_Msg *msg);
+
+/**
+ * TF_SendSimple() with multipart payload.
+ */
+bool TF_SendSimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len);
+
+/**
+ * TF_QuerySimple() with multipart payload.
+ */
+bool TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TF_Listener listener, TF_TICKS timeout);
+
+/**
+ * TF_Query() with multipart payload.
+ * msg.data is ignored and set to NULL
+ */
+bool TF_Query_Multipart(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_TICKS timeout);
+
+/**
+ * TF_Respond() with multipart payload.
+ * msg.data is ignored and set to NULL
+ */
+void TF_Respond_Multipart(TinyFrame *tf, TF_Msg *msg);
+
+/**
+ * Send the payload for a started multipart frame. This can be called multiple times
+ * if needed, until the full length is transmitted.
+ *
+ * @param tf - instance
+ * @param buff - buffer to send bytes from
+ * @param length - number of bytes to send
+ */
+void TF_Multipart_Payload(TinyFrame *tf, const uint8_t *buff, uint32_t length);
+
+/**
+ * Close the multipart message, generating chekcsum and releasing the Tx lock.
+ *
+ * @param tf - instance
+ */
+void TF_Multipart_Close(TinyFrame *tf);
+
+
+// ---------------------------------- INTERNAL ----------------------------------
+// This is publicly visible only to allow static init.
 
 enum TF_State_ {
     TFState_SOF = 0,      //!< Wait for SOF
@@ -153,7 +406,7 @@ struct TF_IdListener_ {
     TF_ID id;
     TF_Listener fn;
     TF_TICKS timeout;     // nr of ticks remaining to disable this listener
-    TF_TICKS timeout_max; // the original timeout is stored here
+    TF_TICKS timeout_max; // the original timeout is stored here (0 = no timeout)
     void *userdata;
     void *userdata2;
 };
@@ -194,12 +447,15 @@ struct TinyFrame_ {
     bool discard_data;      //!< Set if (len > TF_MAX_PAYLOAD) to read the frame, but ignore the data.
 
     /* Tx state */
-    uint32_t tx_pos;
-    uint32_t tx_len;
-    TF_CKSUM tx_cksum;
+    // Buffer for building frames
+    uint8_t sendbuf[TF_SENDBUF_LEN]; //!< Transmit temporary buffer
+
+    uint32_t tx_pos;        //!< Next write position in the Tx buffer (used for multipart)
+    uint32_t tx_len;        //!< Total expected Tx length
+    TF_CKSUM tx_cksum;      //!< Transmit checksum accumulator
 
 #if !TF_USE_MUTEX
-    bool soft_lock;         //!< Lock used if the mutex feature is not enabled.
+    bool soft_lock;         //!< Tx lock flag used if the mutex feature is not enabled.
 #endif
 
     /* --- Callbacks --- */
@@ -215,175 +471,10 @@ struct TinyFrame_ {
     TF_COUNT count_id_lst;
     TF_COUNT count_type_lst;
     TF_COUNT count_generic_lst;
-
-    // Buffer for building frames
-    uint8_t sendbuf[TF_SENDBUF_LEN];
 };
 
-// endregion
 
-// -------------------------------------------------------------------
-
-/**
- * Initialize the TinyFrame engine.
- * This can also be used to completely reset it (removing all listeners etc).
- *
- * The field .userdata (or .usertag) can be used to identify different instances
- * in the TF_WriteImpl() function etc. Set this field after the init.
- *
- * This function is a wrapper around TF_InitStatic that calls malloc() to obtain
- * the instance.
- *
- * @param peer_bit - peer bit to use for self
- * @return TF instance or NULL
- */
-TinyFrame *TF_Init(TF_Peer peer_bit);
-
-
-/**
- * Initialize the TinyFrame engine using a statically allocated instance struct.
- *
- * The .userdata / .usertag field is preserved when TF_InitStatic is called.
- *
- * @param peer_bit - peer bit to use for self
- * @return success
- */
-bool TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit);
-
-/**
- * De-init the dynamically allocated TF instance
- *
- * @param tf
- */
-void TF_DeInit(TinyFrame *tf);
-
-/**
- * Reset the frame parser state machine.
- * This does not affect registered listeners.
- */
-void TF_ResetParser(TinyFrame *tf);
-
-/**
- * Register a frame type listener.
- *
- * @param msg - message (contains frame_id and userdata)
- * @param cb - callback
- * @param timeout - timeout in ticks to auto-remove the listener (0 = keep forever)
- * @return slot index (for removing), or TF_ERROR (-1)
- */
-bool TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_TICKS timeout);
-
-/**
- * Remove a listener by the message ID it's registered for
- *
- * @param frame_id - the frame we're listening for
- */
-bool TF_RemoveIdListener(TinyFrame *tf, TF_ID frame_id);
-
-/**
- * Register a frame type listener.
- *
- * @param frame_type - frame type to listen for
- * @param cb - callback
- * @return slot index (for removing), or TF_ERROR (-1)
- */
-bool TF_AddTypeListener(TinyFrame *tf, TF_TYPE frame_type, TF_Listener cb);
-
-/**
- * Remove a listener by type.
- *
- * @param type - the type it's registered for
- */
-bool TF_RemoveTypeListener(TinyFrame *tf, TF_TYPE type);
-
-/**
- * Register a generic listener.
- *
- * @param cb - callback
- * @return slot index (for removing), or TF_ERROR (-1)
- */
-bool TF_AddGenericListener(TinyFrame *tf, TF_Listener cb);
-
-/**
- * Remove a generic listener by function pointer
- *
- * @param cb - callback function to remove
- */
-bool TF_RemoveGenericListener(TinyFrame *tf, TF_Listener cb);
-
-/**
- * Send a frame, no listener
- *
- * @param msg - message struct. ID is stored in the frame_id field
- * @return success
- */
-bool TF_Send(TinyFrame *tf, TF_Msg *msg);
-
-/**
- * Like TF_Send, but without the struct
- */
-bool TF_SendSimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len);
-
-/**
- * Send a frame, and optionally attach an ID listener.
- *
- * @param msg - message struct. ID is stored in the frame_id field
- * @param listener - listener waiting for the response (can be NULL)
- * @param timeout - listener expiry time in ticks
- * @return success
- */
-bool TF_Query(TinyFrame *tf, TF_Msg *msg,
-              TF_Listener listener, TF_TICKS timeout);
-
-/**
- * Like TF_Query, but without the struct
- */
-bool TF_QuerySimple(TinyFrame *tf, TF_TYPE type,
-                    const uint8_t *data, TF_LEN len,
-                    TF_Listener listener, TF_TICKS timeout);
-
-/**
- * Send a response to a received message.
- *
- * @param msg - message struct. ID is read from frame_id. set ->renew to reset listener timeout
- * @return success
- */
-bool TF_Respond(TinyFrame *tf, TF_Msg *msg);
-
-/**
- * Renew an ID listener timeout externally (as opposed to by returning TF_RENEW from the ID listener)
- *
- * @param id - listener ID to renew
- * @return true if listener was found and renewed
- */
-bool TF_RenewIdListener(TinyFrame *tf, TF_ID id);
-
-/**
- * Accept incoming bytes & parse frames
- *
- * @param buffer - byte buffer to process
- * @param count - nr of bytes in the buffer
- */
-void TF_Accept(TinyFrame *tf, const uint8_t *buffer, uint32_t count);
-
-/**
- * Accept a single incoming byte
- *
- * @param c - a received char
- */
-void TF_AcceptChar(TinyFrame *tf, uint8_t c);
-
-/**
- * This function should be called periodically.
- * The time base is used to time-out partial frames in the parser and
- * automatically reset it.
- * It's also used to expire ID listeners if a timeout is set when registering them.
- *
- * A common place to call this from is the SysTick handler.
- */
-void TF_Tick(TinyFrame *tf);
-
-// --- TO BE IMPLEMENTED BY USER ---
+// ------------------------ TO BE IMPLEMENTED BY USER ------------------------
 
 /**
  * 'Write bytes' function that sends data to UART
