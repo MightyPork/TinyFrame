@@ -39,7 +39,7 @@ void demo_disconn(void)
  * @param buff
  * @param len
  */
-void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, size_t len)
+void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
 {
     printf("\033[32mTF_WriteImpl - sending frame:\033[0m\n");
     dumpFrame(buff, len);

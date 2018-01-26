@@ -11,9 +11,7 @@
 #endif
 
 // Helper macros
-#define TF_MAX(a, b) ((a)>(b)?(a):(b))
 #define TF_MIN(a, b) ((a)<(b)?(a):(b))
-
 #define TF_TRY(func) do { if(!(func)) return false; } while (0)
 
 // TODO It would be nice to have per-instance configurable checksum types, but that would
@@ -685,13 +683,6 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
             break;
     }
     //@formatter:on
-
-    // we get here after finishing HEAD, if no data are to be received - handle and clear
-    // TODO verify - this seems unreachable under normal circumstances
-    if (tf->len == 0 && tf->state == TFState_DATA) {
-        TF_HandleReceivedMessage(tf);
-        TF_ResetParser(tf);
-    }
 }
 
 // Helper macros for the Compose functions
