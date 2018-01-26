@@ -107,8 +107,8 @@ Listener callbacks return values of the `TF_Result` enum:
 
 TinyFrame uses two data buffers: a small transmit buffer and a larger receive buffer.
 The transmit buffer is used to prepare bytes to send, either all at once, or in a 
-circular fashion if the buffer is not large enough. The buffer must be large enough to 
-contain the frame header, so e.g. 32 bytes should be sufficient for short messages.
+circular fashion if the buffer is not large enough. The buffer must only contain the entire 
+frame header, so e.g. 32 bytes should be sufficient for short messages.
 
 Using the `*_Multipart()` sending functions, it's further possible to split the frame 
 header and payload to multiple function calls, allowing the applciation to e.g. generate
