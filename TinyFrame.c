@@ -207,6 +207,9 @@
 
 //endregion
 
+
+//region Init
+
 /** Init with a user-allocated buffer */
 bool _TF_FN TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit)
 {
@@ -247,6 +250,9 @@ void TF_DeInit(TinyFrame *tf)
     if (tf == NULL) return;
     free(tf);
 }
+
+//endregion Init
+
 
 //region Listeners
 
