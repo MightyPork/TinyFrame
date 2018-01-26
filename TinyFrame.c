@@ -269,7 +269,7 @@ static void _TF_FN cleanup_id_listener(TinyFrame *tf, TF_COUNT i, struct TF_IdLi
     if (lst->fn == NULL) return;
 
     // Make user clean up their data - only if not NULL
-    if (lst->userdata != NULL) {
+    if (lst->userdata != NULL || lst->userdata2 != NULL) {
         msg.userdata = lst->userdata;
         msg.userdata2 = lst->userdata2;
         msg.data = NULL; // this is a signal that the listener should clean up
