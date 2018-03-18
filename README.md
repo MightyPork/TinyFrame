@@ -134,6 +134,7 @@ at a higher level and send the data in chunks.
 - Implement `TF_WriteImpl()` - declared at the bottom of the header file as `extern`.
   This function is used by `TF_Send()` and others to write bytes to your UART (or other physical layer).
   A frame can be sent in it's entirety, or in multiple parts, depending on its size.
+- Use TF_AcceptChar(tf, byte) to give read data to TF. TF_Accept(tf, bytes, count) will accept mulitple bytes.  
 - If you wish to use timeouts, periodically call `TF_Tick()`. The calling period determines 
   the length of 1 tick. This is used to time-out the parser in case it gets stuck 
   in a bad state (such as receiving a partial frame) and can also time-out ID listeners.
