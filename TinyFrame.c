@@ -876,7 +876,10 @@ static bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TF_Msg *msg, TF_Listener li
     tf->tx_len = msg->len;
 
     if (listener) {
-        TF_TRY(TF_AddIdListener(tf, msg, listener, timeout));
+        if(!TF_AddIdListener(tf, msg, listener, timeout)) {
+            TF_ReleaseTx(tf);
+            return false;
+        }
     }
 
     CKSUM_RESET(tf->tx_cksum);
