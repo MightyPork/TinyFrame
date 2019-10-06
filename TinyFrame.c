@@ -207,6 +207,27 @@
 
 //endregion
 
+//region escaping
+
+#if TF_ESCAPE_SOF_BYTE
+    static void _TF_FN TF_WriteEscaped(TinyFrame *tf, const uint8_t *buff, uint32_t len) {
+        for(uint32_t i = 0; i < len; i++) {
+            uint8_t c = buff[i];
+            if(c == TF_SOF_BYTE || c == TF_ESCAPE_BYTE) {
+                // invert the bits so we don't Tx a SOF byte
+                c ^= 0xff;
+                // send the escape char
+                TF_WriteImpl(tf, (uint8_t[]){TF_ESCAPE_BYTE}, 1);
+            }
+            // send the byte itself
+            TF_WriteImpl(tf, &c, sizeof(c));
+        }
+    }
+#else
+    #define TF_WriteEscaped TF_WriteImpl
+#endif
+
+//endregion
 
 //region Init
 
@@ -601,6 +622,26 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
     }
 #endif
 
+#if TF_ESCAPE_SOF_BYTE
+    // only SOF/escape bytes can be escaped - anything else is treated normally
+    if(tf->escape_next && (c == (TF_SOF_BYTE ^ 0xff) || c == (TF_ESCAPE_BYTE ^ 0xff))) {
+        // restore the inverted byte
+        c ^= 0xFF;
+    } else {
+        if(c == TF_ESCAPE_BYTE) {
+            tf->escape_next = true;
+            return;
+        }
+
+        if(c == TF_SOF_BYTE && tf->state != TFState_SOF) {
+            TF_ResetParser(tf);
+            TF_Error("Msg truncated");
+        }
+    }
+
+    tf->escape_next = false;
+#endif
+
     //@formatter:off
     switch (tf->state) {
         case TFState_SOF:
@@ -796,7 +837,14 @@ static inline uint32_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF
     CKSUM_RESET(cksum);
 
 #if TF_USE_SOF_BYTE
+#if TF_ESCAPE_SOF_BYTE
+    // write the raw SOF byte without escaping
+    TF_WriteImpl(tf, (uint8_t[]){TF_SOF_BYTE}, 1);
+#else
+    // add it to the buffer as normal
     outbuff[pos++] = TF_SOF_BYTE;
+#endif
+    // add it to the checksum regardless
     CKSUM_ADD(cksum, TF_SOF_BYTE);
 #endif
 
@@ -910,7 +958,7 @@ static void _TF_FN TF_SendFrame_Chunk(TinyFrame *tf, const uint8_t *buff, uint32
 
         // Flush if the buffer is full
         if (tf->tx_pos == TF_SENDBUF_LEN) {
-            TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
+            TF_WriteEscaped(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
             tf->tx_pos = 0;
         }
     }
@@ -927,7 +975,7 @@ static void _TF_FN TF_SendFrame_End(TinyFrame *tf)
     if (tf->tx_len > 0) {
         // Flush if checksum wouldn't fit in the buffer
         if (TF_SENDBUF_LEN - tf->tx_pos < sizeof(TF_CKSUM)) {
-            TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
+            TF_WriteEscaped(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
             tf->tx_pos = 0;
         }
 
@@ -935,7 +983,7 @@ static void _TF_FN TF_SendFrame_End(TinyFrame *tf)
         tf->tx_pos += TF_ComposeTail(tf->sendbuf + tf->tx_pos, &tf->tx_cksum);
     }
 
-    TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
+    TF_WriteEscaped(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
     TF_ReleaseTx(tf);
 }
 
