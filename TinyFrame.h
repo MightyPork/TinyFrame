@@ -244,11 +244,11 @@ void TF_ResetParser(TinyFrame *tf);
  * @param tf - instance
  * @param msg - message (contains frame_id and userdata)
  * @param cb - callback
- * @param fo - time out function
+ * @param ftimeout - time out callback
  * @param timeout - timeout in ticks to auto-remove the listener (0 = keep forever)
  * @return slot index (for removing), or TF_ERROR (-1)
  */
-bool TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb,TF_Listener_Timeout fo, TF_TICKS timeout);
+bool TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
 /**
  * Remove a listener by the message ID it's registered for
@@ -325,18 +325,19 @@ bool TF_SendSimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len)
  * @param tf - instance
  * @param msg - message struct. ID is stored in the frame_id field
  * @param listener - listener waiting for the response (can be NULL)
+ * @param ftimeout - time out callback
  * @param timeout - listener expiry time in ticks
  * @return success
  */
-bool TF_Query(TinyFrame *tf, TF_Msg *msg,
-              TF_Listener listener, TF_TICKS timeout);
+bool TF_QueryTF_Query(TinyFrame *tf, TF_Msg *msg, TF_Listener listener,
+                      TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
 /**
  * Like TF_Query(), but without the struct
  */
 bool TF_QuerySimple(TinyFrame *tf, TF_TYPE type,
                     const uint8_t *data, TF_LEN len,
-                    TF_Listener listener, TF_TICKS timeout);
+                    TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
 /**
  * Send a response to a received message.
@@ -366,13 +367,13 @@ bool TF_SendSimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len);
 /**
  * TF_QuerySimple() with multipart payload.
  */
-bool TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TF_Listener listener, TF_TICKS timeout);
+bool TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
 /**
  * TF_Query() with multipart payload.
  * msg.data is ignored and set to NULL
  */
-bool TF_Query_Multipart(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_TICKS timeout);
+bool TF_Query_Multipart(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
 /**
  * TF_Respond() with multipart payload.
