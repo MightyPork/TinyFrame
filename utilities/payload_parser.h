@@ -41,9 +41,9 @@ typedef struct PayloadParser_ PayloadParser;
 typedef bool (*pp_empty_handler)(PayloadParser *pp, uint32_t needed);
 
 struct PayloadParser_ {
-    uint8_t *start;   //!< Pointer to the beginning of the buffer
-    uint8_t *current; //!< Pointer to the next byte to be read
-    uint8_t *end;     //!< Pointer to the end of the buffer (start + length)
+    const uint8_t *start;   //!< Pointer to the beginning of the buffer
+    const uint8_t *current; //!< Pointer to the next byte to be read
+    const uint8_t *end;     //!< Pointer to the end of the buffer (start + length)
     pp_empty_handler empty_handler; //!< Callback for buffer underrun
     bool bigendian;   //!< Flag to use big-endian parsing
     bool ok;          //!< Indicates that all reads were successful
