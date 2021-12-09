@@ -277,7 +277,7 @@ static void _TF_FN cleanup_id_listener(TinyFrame *tf, TF_COUNT i, struct TF_IdLi
     }
 
     lst->fn = NULL; // Discard listener
-
+    lst->fn_timeout = NULL;
     if (i == tf->count_id_lst - 1) {
         tf->count_id_lst--;
     }
@@ -302,7 +302,7 @@ static inline void _TF_FN cleanup_generic_listener(TinyFrame *tf, TF_COUNT i, st
 }
 
 /** Add a new ID listener. Returns 1 on success. */
-bool _TF_FN TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_TICKS timeout)
+bool _TF_FN TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb,TF_Listener_Timeout fo, TF_TICKS timeout)
 {
     TF_COUNT i;
     struct TF_IdListener_ *lst;
@@ -311,6 +311,7 @@ bool _TF_FN TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_TICK
         // test for empty slot
         if (lst->fn == NULL) {
             lst->fn = cb;
+            lst->fn_timeout = fo;
             lst->id = msg->frame_id;
             lst->userdata = msg->userdata;
             lst->userdata2 = msg->userdata2;
@@ -1071,6 +1072,7 @@ void _TF_FN TF_Tick(TinyFrame *tf)
         // count down...
         if (--lst->timeout == 0) {
             TF_Error("ID listener %d has expired", (int)lst->id);
+            lst->fn_timeout(tf); // execute timeout function 
             // Listener has expired
             cleanup_id_listener(tf, i, lst);
         }

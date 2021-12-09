@@ -149,6 +149,14 @@ typedef struct TinyFrame_ TinyFrame;
  */
 typedef TF_Result (*TF_Listener)(TinyFrame *tf, TF_Msg *msg);
 
+/**
+ * TinyFrame Type Listener callback
+ *
+ * @param tf - instance
+ * @param msg - the received message, userdata is populated inside the object
+ * @return listener result
+ */
+typedef TF_Result (*TF_Listener_Timeout)(TinyFrame *tf);
 
 // ---------------------------------- INIT ------------------------------
 
@@ -236,10 +244,11 @@ void TF_ResetParser(TinyFrame *tf);
  * @param tf - instance
  * @param msg - message (contains frame_id and userdata)
  * @param cb - callback
+ * @param fo - time out function
  * @param timeout - timeout in ticks to auto-remove the listener (0 = keep forever)
  * @return slot index (for removing), or TF_ERROR (-1)
  */
-bool TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_TICKS timeout);
+bool TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb,TF_Listener_Timeout fo, TF_TICKS timeout);
 
 /**
  * Remove a listener by the message ID it's registered for
@@ -405,6 +414,7 @@ enum TF_State_ {
 struct TF_IdListener_ {
     TF_ID id;
     TF_Listener fn;
+    TF_Listener_Timeout fn_timeout;
     TF_TICKS timeout;     // nr of ticks remaining to disable this listener
     TF_TICKS timeout_max; // the original timeout is stored here (0 = no timeout)
     void *userdata;
