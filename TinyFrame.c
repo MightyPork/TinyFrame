@@ -302,7 +302,7 @@ static inline void _TF_FN cleanup_generic_listener(TinyFrame *tf, TF_COUNT i, st
 }
 
 /** Add a new ID listener. Returns 1 on success. */
-bool _TF_FN TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb,TF_Listener_Timeout fo, TF_TICKS timeout)
+bool _TF_FN TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     TF_COUNT i;
     struct TF_IdListener_ *lst;
@@ -311,7 +311,7 @@ bool _TF_FN TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb,TF_Liste
         // test for empty slot
         if (lst->fn == NULL) {
             lst->fn = cb;
-            lst->fn_timeout = fo;
+            lst->fn_timeout = ftimeout;
             lst->id = msg->frame_id;
             lst->userdata = msg->userdata;
             lst->userdata2 = msg->userdata2;
@@ -866,10 +866,11 @@ static inline uint32_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum)
  * @param tf - instance
  * @param msg - message to send
  * @param listener - response listener or NULL
+ * @param ftimeout - time out callback
  * @param timeout - listener timeout ticks, 0 = indefinite
  * @return success (mutex claimed and listener added, if any)
  */
-static bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_TICKS timeout)
+static bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     TF_TRY(TF_ClaimTx(tf));
 
@@ -877,7 +878,7 @@ static bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TF_Msg *msg, TF_Listener li
     tf->tx_len = msg->len;
 
     if (listener) {
-        if(!TF_AddIdListener(tf, msg, listener, timeout)) {
+        if(!TF_AddIdListener(tf, msg, listener, ftimeout, timeout)) {
             TF_ReleaseTx(tf);
             return false;
         }
@@ -946,13 +947,15 @@ static void _TF_FN TF_SendFrame_End(TinyFrame *tf)
  * @param tf - instance
  * @param msg - message object
  * @param listener - ID listener, or NULL
+ * @param ftimeout - time out callback
  * @param timeout - listener timeout, 0 is none
  * @return true if sent
  */
-static bool _TF_FN TF_SendFrame(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_TICKS timeout)
+static bool _TF_FN TF_SendFrame(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
-    TF_TRY(TF_SendFrame_Begin(tf, msg, listener, timeout));
-    if (msg->len == 0 || msg->data != NULL) {
+    TF_TRY(TF_SendFrame_Begin(tf, msg, listener, ftimeout, timeout));
+    if (msg->len == 0 || msg->data != NULL)
+    {
         // Send the payload and checksum only if we're not starting a multi-part frame.
         // A multi-part frame is identified by passing NULL to the data field and setting the length.
         // User then needs to call those functions manually
@@ -970,7 +973,7 @@ static bool _TF_FN TF_SendFrame(TinyFrame *tf, TF_Msg *msg, TF_Listener listener
 /** send without listener */
 bool _TF_FN TF_Send(TinyFrame *tf, TF_Msg *msg)
 {
-    return TF_SendFrame(tf, msg, NULL, 0);
+    return TF_SendFrame(tf, msg, NULL, NULL, 0);
 }
 
 /** send without listener and struct */
@@ -985,20 +988,20 @@ bool _TF_FN TF_SendSimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_L
 }
 
 /** send with a listener waiting for a reply, without the struct */
-bool _TF_FN TF_QuerySimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len, TF_Listener listener, TF_TICKS timeout)
+bool _TF_FN TF_QuerySimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     TF_Msg msg;
     TF_ClearMsg(&msg);
     msg.type = type;
     msg.data = data;
     msg.len = len;
-    return TF_SendFrame(tf, &msg, listener, timeout);
+    return TF_SendFrame(tf, &msg, listener, ftimeout, timeout);
 }
 
 /** send with a listener waiting for a reply */
-bool _TF_FN TF_Query(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_TICKS timeout)
+bool _TF_FN TF_Query(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
-    return TF_SendFrame(tf, msg, listener, timeout);
+    return TF_SendFrame(tf, msg, listener, ftimeout, timeout);
 }
 
 /** Like TF_Send, but with explicit frame ID (set inside the msg object), use for responses */
@@ -1024,15 +1027,15 @@ bool _TF_FN TF_SendSimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len)
     return TF_SendSimple(tf, type, NULL, len);
 }
 
-bool _TF_FN TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TF_Listener listener, TF_TICKS timeout)
+bool _TF_FN TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
-    return TF_QuerySimple(tf, type, NULL, len, listener, timeout);
+    return TF_QuerySimple(tf, type, NULL, len, listener, ftimeout, timeout);
 }
 
-bool _TF_FN TF_Query_Multipart(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_TICKS timeout)
+bool _TF_FN TF_Query_Multipart(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     msg->data = NULL;
-    return TF_Query(tf, msg, listener, timeout);
+    return TF_Query(tf, msg, listener, ftimeout, timeout);
 }
 
 void _TF_FN TF_Respond_Multipart(TinyFrame *tf, TF_Msg *msg)
@@ -1072,7 +1075,9 @@ void _TF_FN TF_Tick(TinyFrame *tf)
         // count down...
         if (--lst->timeout == 0) {
             TF_Error("ID listener %d has expired", (int)lst->id);
-            lst->fn_timeout(tf); // execute timeout function 
+            if (lst->fn_timeout != NULL) {
+                lst->fn_timeout(tf); // execute timeout function
+            }
             // Listener has expired
             cleanup_id_listener(tf, i, lst);
         }
