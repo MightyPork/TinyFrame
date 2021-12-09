@@ -329,8 +329,8 @@ bool TF_SendSimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len)
  * @param timeout - listener expiry time in ticks
  * @return success
  */
-bool TF_QueryTF_Query(TinyFrame *tf, TF_Msg *msg, TF_Listener listener,
-                      TF_Listener_Timeout ftimeout, TF_TICKS timeout);
+bool TF_Query(TinyFrame *tf, TF_Msg *msg, TF_Listener listener,
+              TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
 /**
  * Like TF_Query(), but without the struct

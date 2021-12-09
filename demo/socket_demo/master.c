@@ -29,7 +29,7 @@ int main(void)
     TF_SendSimple(demo_tf, 1, (pu8) "Ahoj", 5);
     TF_SendSimple(demo_tf, 1, (pu8) "Hello", 6);
 
-    TF_QuerySimple(demo_tf, 2, (pu8) "Query!", 6, testIdListener, 0);
+    TF_QuerySimple(demo_tf, 2, (pu8) "Query!", 6, testIdListener, NULL, 0);
 
     demo_sleep();
 }

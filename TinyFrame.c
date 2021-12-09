@@ -278,6 +278,7 @@ static void _TF_FN cleanup_id_listener(TinyFrame *tf, TF_COUNT i, struct TF_IdLi
 
     lst->fn = NULL; // Discard listener
     lst->fn_timeout = NULL;
+
     if (i == tf->count_id_lst - 1) {
         tf->count_id_lst--;
     }
@@ -954,8 +955,7 @@ static void _TF_FN TF_SendFrame_End(TinyFrame *tf)
 static bool _TF_FN TF_SendFrame(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     TF_TRY(TF_SendFrame_Begin(tf, msg, listener, ftimeout, timeout));
-    if (msg->len == 0 || msg->data != NULL)
-    {
+    if (msg->len == 0 || msg->data != NULL) {
         // Send the payload and checksum only if we're not starting a multi-part frame.
         // A multi-part frame is identified by passing NULL to the data field and setting the length.
         // User then needs to call those functions manually
