@@ -42,7 +42,7 @@ TF_Result testIdListener(TinyFrame *tf, TF_Msg *msg)
     return TF_CLOSE;
 }
 
-void main(void)
+int main(void)
 {
     TF_Msg msg;
     const char *longstr = "Lorem ipsum dolor sit amet.";
@@ -71,7 +71,7 @@ void main(void)
 
     msg.len = 0;
     msg.type = 0x77;
-    TF_Query(demo_tf, &msg, testIdListener, 0);
+    TF_Query(demo_tf, &msg, testIdListener, NULL, 0);
     
     printf("This should fail:\n");
     
@@ -81,4 +81,5 @@ void main(void)
     msg.data = (pu8) "Hello2";
     msg.len = 7;
     TF_Send(demo_tf, &msg);
+    return 0;
 }
