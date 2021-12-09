@@ -81,6 +81,18 @@
 
 //endregion
 
+//region Sanity checks
+
+#if TF_ESCAPE_SOF_BYTE && !TF_USE_SOF_BYTE
+    #error TF_ESCAPE_SOF_BYTE enabled but TF_USE_SOF_BYTE disabled
+#endif
+
+#if TF_SOF_BYTE == TF_ESCAPE_BYTE
+    #error SOF byte is identical to escape byte
+#endif
+
+//endregion
+
 //---------------------------------------------------------------------------
 
 /** Peer bit enum (used for init) */
@@ -456,6 +468,10 @@ struct TinyFrame_ {
     TF_CKSUM ref_cksum;     //!< Reference checksum read from the message
     TF_TYPE type;           //!< Collected message type number
     bool discard_data;      //!< Set if (len > TF_MAX_PAYLOAD) to read the frame, but ignore the data.
+
+#if TF_ESCAPE_SOF_BYTE
+    bool escape_next;       //!< Track whether to escape the next character
+#endif
 
     /* Tx state */
     // Buffer for building frames

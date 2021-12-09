@@ -17,10 +17,10 @@
 // If the connection is reliable, you can disable the SOF byte and checksums.
 // That can save up to 9 bytes of overhead.
 
-// ,-----+-----+-----+------+------------+- - - -+-------------,                
-// | SOF | ID  | LEN | TYPE | HEAD_CKSUM | DATA  | DATA_CKSUM  |                
+// ,-----+-----+-----+------+------------+- - - -+-------------,
+// | SOF | ID  | LEN | TYPE | HEAD_CKSUM | DATA  | DATA_CKSUM  |
 // | 0-1 | 1-4 | 1-4 | 1-4  | 0-4        | ...   | 0-4         | <- size (bytes)
-// '-----+-----+-----+------+------------+- - - -+-------------'                
+// '-----+-----+-----+------+------------+- - - -+-------------'
 
 // !!! BOTH PEERS MUST USE THE SAME SETTINGS !!!
 
@@ -39,6 +39,14 @@
 #define TF_USE_SOF_BYTE 1
 // Value of the SOF byte (if TF_USE_SOF_BYTE == 1)
 #define TF_SOF_BYTE     0x01
+
+// SOF *always* marks start of frame, if it appears elsewhere it will be escaped
+// a SOF byte appearing mid-message resets parsing and drops the unprocessed half.
+// When enabled, only 1 byte at a time is sent to TF_WriteImpl. This will incur
+// a performance penalty if you expect to send large chunks with DMA
+#define TF_ESCAPE_SOF_BYTE 1
+// if this byte is seen and TF_ESCAPE_SOF_BYTE == 1, the next byte is treated literally
+#define TF_ESCAPE_BYTE 0x02
 
 //----------------------- PLATFORM COMPATIBILITY ----------------------------
 
