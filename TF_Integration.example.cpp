@@ -1,4 +1,4 @@
-#include "TinyFrame.h"
+#include "TinyFrame.hpp"
 
 /**
  * This is an example of integrating TinyFrame into the application.

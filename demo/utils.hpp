@@ -6,7 +6,7 @@
 #define TF_UTILS_H
 
 #include <stdio.h>
-#include "../TinyFrame.h"
+#include "../TinyFrame.hpp"
 
 /** pointer to unsigned char */
 typedef unsigned char* pu8;

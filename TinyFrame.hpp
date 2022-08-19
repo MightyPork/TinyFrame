@@ -29,7 +29,7 @@
 #define TF_CKSUM_CUSTOM16 2  // Custom 16-bit checksum
 #define TF_CKSUM_CUSTOM32 3  // Custom 32-bit checksum
 
-#include "TF_Config.h"
+#include "TF_Config.hpp"
 
 //region Resolve data types
 

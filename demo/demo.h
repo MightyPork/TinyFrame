@@ -6,8 +6,8 @@
 #define TF_DEMO_H
 
 #include <stdbool.h>
-#include "../TinyFrame.h"
-#include "utils.h"
+#include "../TinyFrame.hpp"
+#include "utils.hpp"
 
 #define PORT 9798
 

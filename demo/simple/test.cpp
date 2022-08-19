@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-#include "../../TinyFrame.h"
-#include "../utils.h"
+#include "../../TinyFrame.hpp"
+#include "../utils.hpp"
 
 TinyFrame *demo_tf;
 

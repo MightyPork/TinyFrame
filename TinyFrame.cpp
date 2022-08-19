@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------
-#include "TinyFrame.h"
+#include "TinyFrame.hpp"
 #include <stdlib.h> // - for malloc() if dynamic constructor is used
 //---------------------------------------------------------------------------
 
