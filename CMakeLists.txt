@@ -8,11 +8,11 @@ set(CMAKE_CXX_STANDARD GNU89)
 
 set(SOURCE_FILES
         demo/simple/test.c
-        demo/socket_demo/master.c
-        demo/socket_demo/slave.c
-        demo/socket_demo/TF_Config.h
-        demo/demo.c
-        demo/demo.h
+        # demo/socket_demo/master.c
+        # demo/socket_demo/slave.c
+        # demo/socket_demo/TF_Config.h
+        # demo/demo.c
+        # demo/demo.h
         TinyFrame.c
         TinyFrame.h
         TF_Config.example.h
