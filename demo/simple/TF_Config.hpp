@@ -14,8 +14,6 @@
 #define TF_CKSUM_TYPE TF_CKSUM_CRC16
 #define TF_USE_SOF_BYTE 1
 #define TF_SOF_BYTE     0x01
-typedef uint16_t TF_TICKS;
-typedef uint8_t TF_COUNT;
 #define TF_MAX_PAYLOAD_RX 1024
 #define TF_SENDBUF_LEN 1024
 #define TF_MAX_ID_LST   10

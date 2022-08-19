@@ -10,10 +10,11 @@ set(SOURCE_FILES
         TinyFrame.cpp
         TinyFrame.hpp
         TF_Config.example.hpp
+        TF_Integration.example.cpp
 
-        demo/simple/test.cpp
-        demo/utils.cpp
-        demo/utils.hpp
+        # demo/simple/test.cpp
+        # demo/utils.cpp
+        # demo/utils.hpp
         
         # demo/socket_demo/master.c
         # demo/socket_demo/slave.c

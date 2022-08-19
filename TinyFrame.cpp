@@ -1,6 +1,7 @@
 //---------------------------------------------------------------------------
 #include "TinyFrame.hpp"
 #include <stdlib.h> // - for malloc() if dynamic constructor is used
+#include <new>
 //---------------------------------------------------------------------------
 
 // Compatibility with ESP8266 SDK
@@ -28,19 +29,19 @@
 
     /** Claim the TX interface before composing and sending a frame */
     static bool TF_ClaimTx(TinyFrame *tf) {
-        if (tf->soft_lock) {
+        if (tf->internal.soft_lock) {
             TF_Error("TF already locked for tx!");
             return false;
         }
 
-        tf->soft_lock = true;
+        tf->internal.soft_lock = true;
         return true;
     }
 
     /** Free the TX interface after composing and sending a frame */
     static void TF_ReleaseTx(TinyFrame *tf)
     {
-        tf->soft_lock = false;
+        tf->internal.soft_lock = false;
     }
 #endif
 
@@ -219,22 +220,22 @@ bool _TF_FN TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit)
     }
 
     // Zero it out, keeping user config
-    uint32_t usertag = tf->usertag;
-    void * userdata = tf->userdata;
+    uint32_t usertag = tf->internal.usertag;
+    void * userdata = tf->internal.userdata;
 
-    memset(tf, 0, sizeof(struct TinyFrame_));
+    TinyFrame* ptr = new((void*)tf) TinyFrame; // placement new
 
-    tf->usertag = usertag;
-    tf->userdata = userdata;
+    tf->internal.usertag = usertag;
+    tf->internal.userdata = userdata;
 
-    tf->peer_bit = peer_bit;
+    tf->internal.peer_bit = peer_bit;
     return true;
 }
 
 /** Init with malloc */
 TinyFrame * _TF_FN TF_Init(TF_Peer peer_bit)
 {
-    TinyFrame *tf = malloc(sizeof(TinyFrame));
+    TinyFrame *tf = new TinyFrame();
     if (!tf) {
         TF_Error("TF_Init() failed, out of memory.");
         return NULL;
@@ -257,15 +258,15 @@ void TF_DeInit(TinyFrame *tf)
 //region Listeners
 
 /** Reset ID listener's timeout to the original value */
-static inline void _TF_FN renew_id_listener(struct TF_IdListener_ *lst)
+static inline void _TF_FN renew_id_listener(TinyFrame::TF_IdListener_ *lst)
 {
     lst->timeout = lst->timeout_max;
 }
 
 /** Notify callback about ID listener's demise & let it free any resources in userdata */
-static void _TF_FN cleanup_id_listener(TinyFrame *tf, TF_COUNT i, struct TF_IdListener_ *lst)
+static void _TF_FN cleanup_id_listener(TinyFrame *tf, TF_COUNT i, TinyFrame::TF_IdListener_ *lst)
 {
-    TF_Msg msg;
+    TinyFrame::TF_Msg msg;
     if (lst->fn == NULL) return;
 
     // Make user clean up their data - only if not NULL
@@ -279,36 +280,36 @@ static void _TF_FN cleanup_id_listener(TinyFrame *tf, TF_COUNT i, struct TF_IdLi
     lst->fn = NULL; // Discard listener
     lst->fn_timeout = NULL;
 
-    if (i == tf->count_id_lst - 1) {
-        tf->count_id_lst--;
+    if (i == tf->internal.count_id_lst - 1) {
+        tf->internal.count_id_lst--;
     }
 }
 
 /** Clean up Type listener */
-static inline void _TF_FN cleanup_type_listener(TinyFrame *tf, TF_COUNT i, struct TF_TypeListener_ *lst)
+static inline void _TF_FN cleanup_type_listener(TinyFrame *tf, TF_COUNT i, TinyFrame::TF_TypeListener_ *lst)
 {
     lst->fn = NULL; // Discard listener
-    if (i == tf->count_type_lst - 1) {
-        tf->count_type_lst--;
+    if (i == tf->internal.count_type_lst - 1) {
+        tf->internal.count_type_lst--;
     }
 }
 
 /** Clean up Generic listener */
-static inline void _TF_FN cleanup_generic_listener(TinyFrame *tf, TF_COUNT i, struct TF_GenericListener_ *lst)
+static inline void _TF_FN cleanup_generic_listener(TinyFrame *tf, TF_COUNT i, TinyFrame::TF_GenericListener_ *lst)
 {
     lst->fn = NULL; // Discard listener
-    if (i == tf->count_generic_lst - 1) {
-        tf->count_generic_lst--;
+    if (i == tf->internal.count_generic_lst - 1) {
+        tf->internal.count_generic_lst--;
     }
 }
 
 /** Add a new ID listener. Returns 1 on success. */
-bool _TF_FN TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+bool _TF_FN TF_AddIdListener(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener cb, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     TF_COUNT i;
-    struct TF_IdListener_ *lst;
+    TinyFrame::TF_IdListener_ *lst;
     for (i = 0; i < TF_MAX_ID_LST; i++) {
-        lst = &tf->id_listeners[i];
+        lst = &tf->internal.id_listeners[i];
         // test for empty slot
         if (lst->fn == NULL) {
             lst->fn = cb;
@@ -317,8 +318,8 @@ bool _TF_FN TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_List
             lst->userdata = msg->userdata;
             lst->userdata2 = msg->userdata2;
             lst->timeout_max = lst->timeout = timeout;
-            if (i >= tf->count_id_lst) {
-                tf->count_id_lst = (TF_COUNT) (i + 1);
+            if (i >= tf->internal.count_id_lst) {
+                tf->internal.count_id_lst = (TF_COUNT) (i + 1);
             }
             return true;
         }
@@ -329,18 +330,18 @@ bool _TF_FN TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_List
 }
 
 /** Add a new Type listener. Returns 1 on success. */
-bool _TF_FN TF_AddTypeListener(TinyFrame *tf, TF_TYPE frame_type, TF_Listener cb)
+bool _TF_FN TF_AddTypeListener(TinyFrame *tf, TF_TYPE frame_type, TinyFrame::TF_Listener cb)
 {
     TF_COUNT i;
-    struct TF_TypeListener_ *lst;
+    TinyFrame::TF_TypeListener_ *lst;
     for (i = 0; i < TF_MAX_TYPE_LST; i++) {
-        lst = &tf->type_listeners[i];
+        lst = &tf->internal.type_listeners[i];
         // test for empty slot
         if (lst->fn == NULL) {
             lst->fn = cb;
             lst->type = frame_type;
-            if (i >= tf->count_type_lst) {
-                tf->count_type_lst = (TF_COUNT) (i + 1);
+            if (i >= tf->internal.count_type_lst) {
+                tf->internal.count_type_lst = (TF_COUNT) (i + 1);
             }
             return true;
         }
@@ -351,17 +352,17 @@ bool _TF_FN TF_AddTypeListener(TinyFrame *tf, TF_TYPE frame_type, TF_Listener cb
 }
 
 /** Add a new Generic listener. Returns 1 on success. */
-bool _TF_FN TF_AddGenericListener(TinyFrame *tf, TF_Listener cb)
+bool _TF_FN TF_AddGenericListener(TinyFrame *tf, TinyFrame::TF_Listener cb)
 {
     TF_COUNT i;
-    struct TF_GenericListener_ *lst;
+    TinyFrame::TF_GenericListener_ *lst;
     for (i = 0; i < TF_MAX_GEN_LST; i++) {
-        lst = &tf->generic_listeners[i];
+        lst = &tf->internal.generic_listeners[i];
         // test for empty slot
         if (lst->fn == NULL) {
             lst->fn = cb;
-            if (i >= tf->count_generic_lst) {
-                tf->count_generic_lst = (TF_COUNT) (i + 1);
+            if (i >= tf->internal.count_generic_lst) {
+                tf->internal.count_generic_lst = (TF_COUNT) (i + 1);
             }
             return true;
         }
@@ -375,9 +376,9 @@ bool _TF_FN TF_AddGenericListener(TinyFrame *tf, TF_Listener cb)
 bool _TF_FN TF_RemoveIdListener(TinyFrame *tf, TF_ID frame_id)
 {
     TF_COUNT i;
-    struct TF_IdListener_ *lst;
-    for (i = 0; i < tf->count_id_lst; i++) {
-        lst = &tf->id_listeners[i];
+    TinyFrame::TF_IdListener_ *lst;
+    for (i = 0; i < tf->internal.count_id_lst; i++) {
+        lst = &tf->internal.id_listeners[i];
         // test if live & matching
         if (lst->fn != NULL && lst->id == frame_id) {
             cleanup_id_listener(tf, i, lst);
@@ -393,9 +394,9 @@ bool _TF_FN TF_RemoveIdListener(TinyFrame *tf, TF_ID frame_id)
 bool _TF_FN TF_RemoveTypeListener(TinyFrame *tf, TF_TYPE type)
 {
     TF_COUNT i;
-    struct TF_TypeListener_ *lst;
-    for (i = 0; i < tf->count_type_lst; i++) {
-        lst = &tf->type_listeners[i];
+    TinyFrame::TF_TypeListener_ *lst;
+    for (i = 0; i < tf->internal.count_type_lst; i++) {
+        lst = &tf->internal.type_listeners[i];
         // test if live & matching
         if (lst->fn != NULL    && lst->type == type) {
             cleanup_type_listener(tf, i, lst);
@@ -408,12 +409,12 @@ bool _TF_FN TF_RemoveTypeListener(TinyFrame *tf, TF_TYPE type)
 }
 
 /** Remove a generic listener by its function pointer. Returns 1 on success. */
-bool _TF_FN TF_RemoveGenericListener(TinyFrame *tf, TF_Listener cb)
+bool _TF_FN TF_RemoveGenericListener(TinyFrame *tf, TinyFrame::TF_Listener cb)
 {
     TF_COUNT i;
-    struct TF_GenericListener_ *lst;
-    for (i = 0; i < tf->count_generic_lst; i++) {
-        lst = &tf->generic_listeners[i];
+    TinyFrame::TF_GenericListener_ *lst;
+    for (i = 0; i < tf->internal.count_generic_lst; i++) {
+        lst = &tf->internal.generic_listeners[i];
         // test if live & matching
         if (lst->fn == cb) {
             cleanup_generic_listener(tf, i, lst);
@@ -429,19 +430,19 @@ bool _TF_FN TF_RemoveGenericListener(TinyFrame *tf, TF_Listener cb)
 static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf)
 {
     TF_COUNT i;
-    struct TF_IdListener_ *ilst;
-    struct TF_TypeListener_ *tlst;
-    struct TF_GenericListener_ *glst;
+    TinyFrame::TF_IdListener_ *ilst;
+    TinyFrame::TF_TypeListener_ *tlst;
+    TinyFrame::TF_GenericListener_ *glst;
     TF_Result res;
 
     // Prepare message object
-    TF_Msg msg;
+    TinyFrame::TF_Msg msg;
     TF_ClearMsg(&msg);
-    msg.frame_id = tf->id;
+    msg.frame_id = tf->internal.id;
     msg.is_response = false;
-    msg.type = tf->type;
-    msg.data = tf->data;
-    msg.len = tf->len;
+    msg.type = tf->internal.type;
+    msg.data = tf->internal.data;
+    msg.len = tf->internal.len;
 
     // Any listener can consume the message, or let someone else handle it.
 
@@ -449,8 +450,8 @@ static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf)
     // (or close to it, depending on the order of listener removals).
 
     // ID listeners first
-    for (i = 0; i < tf->count_id_lst; i++) {
-        ilst = &tf->id_listeners[i];
+    for (i = 0; i < tf->internal.count_id_lst; i++) {
+        ilst = &tf->internal.id_listeners[i];
 
         if (ilst->fn && ilst->id == msg.frame_id) {
             msg.userdata = ilst->userdata; // pass userdata pointer to the callback
@@ -480,8 +481,8 @@ static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf)
     msg.userdata2 = NULL;
 
     // Type listeners
-    for (i = 0; i < tf->count_type_lst; i++) {
-        tlst = &tf->type_listeners[i];
+    for (i = 0; i < tf->internal.count_type_lst; i++) {
+        tlst = &tf->internal.type_listeners[i];
 
         if (tlst->fn && tlst->type == msg.type) {
             res = tlst->fn(tf, &msg);
@@ -499,8 +500,8 @@ static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf)
     }
 
     // Generic listeners
-    for (i = 0; i < tf->count_generic_lst; i++) {
-        glst = &tf->generic_listeners[i];
+    for (i = 0; i < tf->internal.count_generic_lst; i++) {
+        glst = &tf->internal.generic_listeners[i];
 
         if (glst->fn) {
             res = glst->fn(tf, &msg);
@@ -528,9 +529,9 @@ static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf)
 bool _TF_FN TF_RenewIdListener(TinyFrame *tf, TF_ID id)
 {
     TF_COUNT i;
-    struct TF_IdListener_ *lst;
-    for (i = 0; i < tf->count_id_lst; i++) {
-        lst = &tf->id_listeners[i];
+    TinyFrame::TF_IdListener_ *lst;
+    for (i = 0; i < tf->internal.count_id_lst; i++) {
+        lst = &tf->internal.id_listeners[i];
         // test if live & matching
         if (lst->fn != NULL && lst->id == id) {
             renew_id_listener(lst);
@@ -559,52 +560,52 @@ void _TF_FN TF_Accept(TinyFrame *tf, const uint8_t *buffer, uint32_t count)
 /** Reset the parser's internal state. */
 void _TF_FN TF_ResetParser(TinyFrame *tf)
 {
-    tf->state = TFState_SOF;
+    tf->internal.state = TFState_SOF;
     // more init will be done by the parser when the first byte is received
 }
 
 /** SOF was received - prepare for the frame */
 static void _TF_FN pars_begin_frame(TinyFrame *tf) {
     // Reset state vars
-    CKSUM_RESET(tf->cksum);
+    CKSUM_RESET(tf->internal.cksum);
 #if TF_USE_SOF_BYTE
-    CKSUM_ADD(tf->cksum, TF_SOF_BYTE);
+    CKSUM_ADD(tf->internal.cksum, TF_SOF_BYTE);
 #endif
 
-    tf->discard_data = false;
+    tf->internal.discard_data = false;
 
     // Enter ID state
-    tf->state = TFState_ID;
-    tf->rxi = 0;
+    tf->internal.state = TFState_ID;
+    tf->internal.rxi = 0;
 }
 
 /** Handle a received char - here's the main state machine */
 void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
 {
     // Parser timeout - clear
-    if (tf->parser_timeout_ticks >= TF_PARSER_TIMEOUT_TICKS) {
-        if (tf->state != TFState_SOF) {
+    if (tf->internal.parser_timeout_ticks >= TF_PARSER_TIMEOUT_TICKS) {
+        if (tf->internal.state != TFState_SOF) {
             TF_ResetParser(tf);
             TF_Error("Parser timeout");
         }
     }
-    tf->parser_timeout_ticks = 0;
+    tf->internal.parser_timeout_ticks = 0;
 
 // DRY snippet - collect multi-byte number from the input stream, byte by byte
 // This is a little dirty, but makes the code easier to read. It's used like e.g. if(),
 // the body is run only after the entire number (of data type 'type') was received
 // and stored to 'dest'
 #define COLLECT_NUMBER(dest, type) dest = (type)(((dest) << 8) | c); \
-                                   if (++tf->rxi == sizeof(type))
+                                   if (++tf->internal.rxi == sizeof(type))
 
 #if !TF_USE_SOF_BYTE
-    if (tf->state == TFState_SOF) {
+    if (tf->internal.state == TFState_SOF) {
         pars_begin_frame(tf);
     }
 #endif
 
     //@formatter:off
-    switch (tf->state) {
+    switch (tf->internal.state) {
         case TFState_SOF:
             if (c == TF_SOF_BYTE) {
                 pars_begin_frame(tf);
@@ -612,50 +613,50 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
             break;
 
         case TFState_ID:
-            CKSUM_ADD(tf->cksum, c);
-            COLLECT_NUMBER(tf->id, TF_ID) {
+            CKSUM_ADD(tf->internal.cksum, c);
+            COLLECT_NUMBER(tf->internal.id, TF_ID) {
                 // Enter LEN state
-                tf->state = TFState_LEN;
-                tf->rxi = 0;
+                tf->internal.state = TFState_LEN;
+                tf->internal.rxi = 0;
             }
             break;
 
         case TFState_LEN:
-            CKSUM_ADD(tf->cksum, c);
-            COLLECT_NUMBER(tf->len, TF_LEN) {
+            CKSUM_ADD(tf->internal.cksum, c);
+            COLLECT_NUMBER(tf->internal.len, TF_LEN) {
                 // Enter TYPE state
-                tf->state = TFState_TYPE;
-                tf->rxi = 0;
+                tf->internal.state = TFState_TYPE;
+                tf->internal.rxi = 0;
             }
             break;
 
         case TFState_TYPE:
-            CKSUM_ADD(tf->cksum, c);
-            COLLECT_NUMBER(tf->type, TF_TYPE) {
+            CKSUM_ADD(tf->internal.cksum, c);
+            COLLECT_NUMBER(tf->internal.type, TF_TYPE) {
                 #if TF_CKSUM_TYPE == TF_CKSUM_NONE
-                    tf->state = TFState_DATA;
-                    tf->rxi = 0;
+                    tf->internal.state = TFState_DATA;
+                    tf->internal.rxi = 0;
                 #else
                     // enter HEAD_CKSUM state
-                    tf->state = TFState_HEAD_CKSUM;
-                    tf->rxi = 0;
-                    tf->ref_cksum = 0;
+                    tf->internal.state = TFState_HEAD_CKSUM;
+                    tf->internal.rxi = 0;
+                    tf->internal.ref_cksum = 0;
                 #endif
             }
             break;
 
         case TFState_HEAD_CKSUM:
-            COLLECT_NUMBER(tf->ref_cksum, TF_CKSUM) {
+            COLLECT_NUMBER(tf->internal.ref_cksum, TF_CKSUM) {
                 // Check the header checksum against the computed value
-                CKSUM_FINALIZE(tf->cksum);
+                CKSUM_FINALIZE(tf->internal.cksum);
 
-                if (tf->cksum != tf->ref_cksum) {
+                if (tf->internal.cksum != tf->internal.ref_cksum) {
                     TF_Error("Rx head cksum mismatch");
                     TF_ResetParser(tf);
                     break;
                 }
 
-                if (tf->len == 0) {
+                if (tf->internal.len == 0) {
                     // if the message has no body, we're done.
                     TF_HandleReceivedMessage(tf);
                     TF_ResetParser(tf);
@@ -663,47 +664,47 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
                 }
 
                 // Enter DATA state
-                tf->state = TFState_DATA;
-                tf->rxi = 0;
+                tf->internal.state = TFState_DATA;
+                tf->internal.rxi = 0;
 
-                CKSUM_RESET(tf->cksum); // Start collecting the payload
+                CKSUM_RESET(tf->internal.cksum); // Start collecting the payload
 
-                if (tf->len > TF_MAX_PAYLOAD_RX) {
-                    TF_Error("Rx payload too long: %d", (int)tf->len);
+                if (tf->internal.len > TF_MAX_PAYLOAD_RX) {
+                    TF_Error("Rx payload too long: %d", (int)tf->internal.len);
                     // ERROR - frame too long. Consume, but do not store.
-                    tf->discard_data = true;
+                    tf->internal.discard_data = true;
                 }
             }
             break;
 
         case TFState_DATA:
-            if (tf->discard_data) {
-                tf->rxi++;
+            if (tf->internal.discard_data) {
+                tf->internal.rxi++;
             } else {
-                CKSUM_ADD(tf->cksum, c);
-                tf->data[tf->rxi++] = c;
+                CKSUM_ADD(tf->internal.cksum, c);
+                tf->internal.data[tf->internal.rxi++] = c;
             }
 
-            if (tf->rxi == tf->len) {
+            if (tf->internal.rxi == tf->internal.len) {
                 #if TF_CKSUM_TYPE == TF_CKSUM_NONE
                     // All done
                     TF_HandleReceivedMessage(tf);
                     TF_ResetParser(tf);
                 #else
                     // Enter DATA_CKSUM state
-                    tf->state = TFState_DATA_CKSUM;
-                    tf->rxi = 0;
-                    tf->ref_cksum = 0;
+                    tf->internal.state = TFState_DATA_CKSUM;
+                    tf->internal.rxi = 0;
+                    tf->internal.ref_cksum = 0;
                 #endif
             }
             break;
 
         case TFState_DATA_CKSUM:
-            COLLECT_NUMBER(tf->ref_cksum, TF_CKSUM) {
+            COLLECT_NUMBER(tf->internal.ref_cksum, TF_CKSUM) {
                 // Check the header checksum against the computed value
-                CKSUM_FINALIZE(tf->cksum);
-                if (!tf->discard_data) {
-                    if (tf->cksum == tf->ref_cksum) {
+                CKSUM_FINALIZE(tf->internal.cksum);
+                if (!tf->internal.discard_data) {
+                    if (tf->internal.cksum == tf->internal.ref_cksum) {
                         TF_HandleReceivedMessage(tf);
                     } else {
                         TF_Error("Body cksum mismatch");
@@ -769,7 +770,7 @@ void _TF_FN TF_AcceptChar(TinyFrame *tf, unsigned char c)
  * @param msg - message written to the buffer
  * @return nr of bytes in outbuff used by the frame, 0 on failure
  */
-static inline uint32_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF_Msg *msg)
+static inline uint32_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TinyFrame::TF_Msg *msg)
 {
     int8_t si = 0; // signed small int
     uint8_t b = 0;
@@ -786,8 +787,8 @@ static inline uint32_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF
         id = msg->frame_id;
     }
     else {
-        id = (TF_ID) (tf->next_id++ & TF_ID_MASK);
-        if (tf->peer_bit) {
+        id = (TF_ID) (tf->internal.next_id++ & TF_ID_MASK);
+        if (tf->internal.peer_bit) {
             id |= TF_ID_PEERBIT;
         }
     }
@@ -871,12 +872,12 @@ static inline uint32_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum)
  * @param timeout - listener timeout ticks, 0 = indefinite
  * @return success (mutex claimed and listener added, if any)
  */
-static bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+static bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     TF_TRY(TF_ClaimTx(tf));
 
-    tf->tx_pos = (uint32_t) TF_ComposeHead(tf, tf->sendbuf, msg); // frame ID is incremented here if it's not a response
-    tf->tx_len = msg->len;
+    tf->internal.tx_pos = (uint32_t) TF_ComposeHead(tf, tf->internal.sendbuf, msg); // frame ID is incremented here if it's not a response
+    tf->internal.tx_len = msg->len;
 
     if (listener) {
         if(!TF_AddIdListener(tf, msg, listener, ftimeout, timeout)) {
@@ -885,7 +886,7 @@ static bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TF_Msg *msg, TF_Listener li
         }
     }
 
-    CKSUM_RESET(tf->tx_cksum);
+    CKSUM_RESET(tf->internal.tx_cksum);
     return true;
 }
 
@@ -906,15 +907,15 @@ static void _TF_FN TF_SendFrame_Chunk(TinyFrame *tf, const uint8_t *buff, uint32
     remain = length;
     while (remain > 0) {
         // Write what can fit in the tx buffer
-        chunk = TF_MIN(TF_SENDBUF_LEN - tf->tx_pos, remain);
-        tf->tx_pos += TF_ComposeBody(tf->sendbuf+tf->tx_pos, buff+sent, (TF_LEN) chunk, &tf->tx_cksum);
+        chunk = TF_MIN(TF_SENDBUF_LEN - tf->internal.tx_pos, remain);
+        tf->internal.tx_pos += TF_ComposeBody(tf->internal.sendbuf+tf->internal.tx_pos, buff+sent, (TF_LEN) chunk, &tf->internal.tx_cksum);
         remain -= chunk;
         sent += chunk;
 
         // Flush if the buffer is full
-        if (tf->tx_pos == TF_SENDBUF_LEN) {
-            TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
-            tf->tx_pos = 0;
+        if (tf->internal.tx_pos == TF_SENDBUF_LEN) {
+            TF_WriteImpl(tf, (const uint8_t *) tf->internal.sendbuf, tf->internal.tx_pos);
+            tf->internal.tx_pos = 0;
         }
     }
 }
@@ -927,18 +928,18 @@ static void _TF_FN TF_SendFrame_Chunk(TinyFrame *tf, const uint8_t *buff, uint32
 static void _TF_FN TF_SendFrame_End(TinyFrame *tf)
 {
     // Checksum only if message had a body
-    if (tf->tx_len > 0) {
+    if (tf->internal.tx_len > 0) {
         // Flush if checksum wouldn't fit in the buffer
-        if (TF_SENDBUF_LEN - tf->tx_pos < sizeof(TF_CKSUM)) {
-            TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
-            tf->tx_pos = 0;
+        if (TF_SENDBUF_LEN - tf->internal.tx_pos < sizeof(TF_CKSUM)) {
+            TF_WriteImpl(tf, (const uint8_t *) tf->internal.sendbuf, tf->internal.tx_pos);
+            tf->internal.tx_pos = 0;
         }
 
         // Add checksum, flush what remains to be sent
-        tf->tx_pos += TF_ComposeTail(tf->sendbuf + tf->tx_pos, &tf->tx_cksum);
+        tf->internal.tx_pos += TF_ComposeTail(tf->internal.sendbuf + tf->internal.tx_pos, &tf->internal.tx_cksum);
     }
 
-    TF_WriteImpl(tf, (const uint8_t *) tf->sendbuf, tf->tx_pos);
+    TF_WriteImpl(tf, (const uint8_t *) tf->internal.sendbuf, tf->internal.tx_pos);
     TF_ReleaseTx(tf);
 }
 
@@ -952,7 +953,7 @@ static void _TF_FN TF_SendFrame_End(TinyFrame *tf)
  * @param timeout - listener timeout, 0 is none
  * @return true if sent
  */
-static bool _TF_FN TF_SendFrame(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+static bool _TF_FN TF_SendFrame(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     TF_TRY(TF_SendFrame_Begin(tf, msg, listener, ftimeout, timeout));
     if (msg->len == 0 || msg->data != NULL) {
@@ -971,7 +972,7 @@ static bool _TF_FN TF_SendFrame(TinyFrame *tf, TF_Msg *msg, TF_Listener listener
 //region Sending API funcs
 
 /** send without listener */
-bool _TF_FN TF_Send(TinyFrame *tf, TF_Msg *msg)
+bool _TF_FN TF_Send(TinyFrame *tf, TinyFrame::TF_Msg *msg)
 {
     return TF_SendFrame(tf, msg, NULL, NULL, 0);
 }
@@ -979,7 +980,7 @@ bool _TF_FN TF_Send(TinyFrame *tf, TF_Msg *msg)
 /** send without listener and struct */
 bool _TF_FN TF_SendSimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len)
 {
-    TF_Msg msg;
+    TinyFrame::TF_Msg msg;
     TF_ClearMsg(&msg);
     msg.type = type;
     msg.data = data;
@@ -988,9 +989,9 @@ bool _TF_FN TF_SendSimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_L
 }
 
 /** send with a listener waiting for a reply, without the struct */
-bool _TF_FN TF_QuerySimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+bool _TF_FN TF_QuerySimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
-    TF_Msg msg;
+    TinyFrame::TF_Msg msg;
     TF_ClearMsg(&msg);
     msg.type = type;
     msg.data = data;
@@ -999,13 +1000,13 @@ bool _TF_FN TF_QuerySimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_
 }
 
 /** send with a listener waiting for a reply */
-bool _TF_FN TF_Query(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+bool _TF_FN TF_Query(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     return TF_SendFrame(tf, msg, listener, ftimeout, timeout);
 }
 
 /** Like TF_Send, but with explicit frame ID (set inside the msg object), use for responses */
-bool _TF_FN TF_Respond(TinyFrame *tf, TF_Msg *msg)
+bool _TF_FN TF_Respond(TinyFrame *tf, TinyFrame::TF_Msg *msg)
 {
     msg->is_response = true;
     return TF_Send(tf, msg);
@@ -1016,7 +1017,7 @@ bool _TF_FN TF_Respond(TinyFrame *tf, TF_Msg *msg)
 
 //region Sending API funcs - multipart
 
-bool _TF_FN TF_Send_Multipart(TinyFrame *tf, TF_Msg *msg)
+bool _TF_FN TF_Send_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg)
 {
     msg->data = NULL;
     return TF_Send(tf, msg);
@@ -1027,18 +1028,18 @@ bool _TF_FN TF_SendSimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len)
     return TF_SendSimple(tf, type, NULL, len);
 }
 
-bool _TF_FN TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+bool _TF_FN TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     return TF_QuerySimple(tf, type, NULL, len, listener, ftimeout, timeout);
 }
 
-bool _TF_FN TF_Query_Multipart(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+bool _TF_FN TF_Query_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     msg->data = NULL;
     return TF_Query(tf, msg, listener, ftimeout, timeout);
 }
 
-void _TF_FN TF_Respond_Multipart(TinyFrame *tf, TF_Msg *msg)
+void _TF_FN TF_Respond_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg)
 {
     msg->data = NULL;
     TF_Respond(tf, msg);
@@ -1061,16 +1062,16 @@ void _TF_FN TF_Multipart_Close(TinyFrame *tf)
 void _TF_FN TF_Tick(TinyFrame *tf)
 {
     TF_COUNT i;
-    struct TF_IdListener_ *lst;
+    TinyFrame::TF_IdListener_ *lst;
 
     // increment parser timeout (timeout is handled when receiving next byte)
-    if (tf->parser_timeout_ticks < TF_PARSER_TIMEOUT_TICKS) {
-        tf->parser_timeout_ticks++;
+    if (tf->internal.parser_timeout_ticks < TF_PARSER_TIMEOUT_TICKS) {
+        tf->internal.parser_timeout_ticks++;
     }
 
     // decrement and expire ID listeners
-    for (i = 0; i < tf->count_id_lst; i++) {
-        lst = &tf->id_listeners[i];
+    for (i = 0; i < tf->internal.count_id_lst; i++) {
+        lst = &tf->internal.id_listeners[i];
         if (!lst->fn || lst->timeout == 0) continue;
         // count down...
         if (--lst->timeout == 0) {

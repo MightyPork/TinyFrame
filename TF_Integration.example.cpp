@@ -53,3 +53,7 @@ TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)
 {
     return cksum;
 }
+
+int main(){
+    
+}
