@@ -2,15 +2,10 @@
 #define TinyFrame_TypesHPP
 
 #include <cstdint>  // for uint8_t etc
-//#include <cstddef>  // for nullptr
 
 #include "TF_Config.hpp"
 
 namespace TinyFrame_n{
-
-typedef uint16_t TF_TICKS;
-typedef uint8_t TF_COUNT;
-
 
 // Checksum type (0 = none, 8 = ~XOR, 16 = CRC16 0x8005, 32 = CRC32)
 enum class TF_CKSUM_t{
@@ -26,43 +21,16 @@ enum class TF_CKSUM_t{
 
 //region Resolve data types
 
-#if TF_LEN_BYTES == 1
-    typedef uint8_t TF_LEN;
-#elif TF_LEN_BYTES == 2
-    typedef uint16_t TF_LEN;
-#elif TF_LEN_BYTES == 4
-    typedef uint32_t TF_LEN;
-#else
-    #error Bad value of TF_LEN_BYTES, must be 1, 2 or 4
-#endif
+typedef size_t TF_LEN; // TF_LEN_BYTES
+typedef size_t TF_TYPE; // TF_TYPE_BYTES
+typedef size_t TF_ID; // TF_ID_BYTES
 
-// Compatibility with ESP8266 SDK
-#ifdef ICACHE_FLASH_ATTR
-#define _TF_FN ICACHE_FLASH_ATTR
-#else
+// TODO: runtime checks
+// #if TF_ID_BYTES != 1 and TF_ID_BYTES != 2 and TF_ID_BYTES != 4
+//     #error Bad value of TF_ID_BYTES, must be 1, 2 or 4
+// #endif
+
 #define _TF_FN
-#endif
-
-#if TF_TYPE_BYTES == 1
-    typedef uint8_t TF_TYPE;
-#elif TF_TYPE_BYTES == 2
-    typedef uint16_t TF_TYPE;
-#elif TF_TYPE_BYTES == 4
-    typedef uint32_t TF_TYPE;
-#else
-    #error Bad value of TF_TYPE_BYTES, must be 1, 2 or 4
-#endif
-
-
-#if TF_ID_BYTES == 1
-    typedef uint8_t TF_ID;
-#elif TF_ID_BYTES == 2
-    typedef uint16_t TF_ID;
-#elif TF_ID_BYTES == 4
-    typedef uint32_t TF_ID;
-#else
-    #error Bad value of TF_ID_BYTES, must be 1, 2 or 4
-#endif
 
 template <TF_CKSUM_t TF_CKSUM_TYPE>
 struct CKSUM_TYPE_MAP;

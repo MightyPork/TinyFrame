@@ -8,11 +8,10 @@
 #define TF_CONFIG_H
 
 #include <cstdint>
-#include <cstdio> // used by the TF_Error() macro defined below
-//#include <esp8266.h> // when using with esphttpd
 
 namespace TinyFrame_n{
 
+const struct TinyFrameConfig_t{
 //----------------------------- FRAME FORMAT ---------------------------------
 // The format can be adjusted to fit your particular application needs
 
@@ -27,22 +26,27 @@ namespace TinyFrame_n{
 // !!! BOTH PEERS MUST USE THE SAME SETTINGS !!!
 
 // Adjust sizes as desired (1,2,4)
-#define TF_ID_BYTES     1
-#define TF_LEN_BYTES    2
-#define TF_TYPE_BYTES   1
+uint8_t TF_ID_BYTES =     1U;
+uint8_t TF_LEN_BYTES =    2U;
+uint8_t TF_TYPE_BYTES =   1U;
 
 // Use a SOF byte to mark the start of a frame
-#define TF_USE_SOF_BYTE 1
+uint8_t TF_USE_SOF_BYTE = 1U;
 // Value of the SOF byte (if TF_USE_SOF_BYTE == 1)
-#define TF_SOF_BYTE     0x01
+uint8_t TF_SOF_BYTE =     0x01U;
 
+// Timeout for receiving & parsing a frame
+// ticks = number of calls to TF_Tick()
+uint8_t TF_PARSER_TIMEOUT_TICKS = 10U;
+
+}TF_CONFIG_DEFAULT;
 //----------------------- PLATFORM COMPATIBILITY ----------------------------
 
 // used for timeout tick counters - should be large enough for all used timeouts
-typedef uint16_t TF_TICKS;
+typedef size_t TF_TICKS;
 
 // used in loops iterating over listeners
-typedef uint8_t TF_COUNT;
+typedef size_t TF_COUNT;
 
 //----------------------------- PARAMETERS ----------------------------------
 
@@ -62,15 +66,11 @@ typedef uint8_t TF_COUNT;
 // Generic listeners (fallback if no other listener catches it)
 #define TF_MAX_GEN_LST  5
 
-// Timeout for receiving & parsing a frame
-// ticks = number of calls to TF_Tick()
-#define TF_PARSER_TIMEOUT_TICKS 10
-
 // Whether to use mutex - requires you to implement TF_ClaimTx() and TF_ReleaseTx()
 #define TF_USE_MUTEX  1
 
 // Error reporting function. To disable debug, change to empty define
-#define TF_Error(format, ...) printf("[TF] " format "\n", ##__VA_ARGS__)
+#define TF_Error(format, ...) 
 
 //------------------------- End of user config ------------------------------
 } // TinyFrame_n

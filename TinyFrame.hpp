@@ -13,7 +13,6 @@
 
 
 //---------------------------------------------------------------------------
-#include <cstring>  // for memset()
 #include <new> // placement new
 //---------------------------------------------------------------------------
 
@@ -35,9 +34,13 @@ class TinyFrame{
 
     public:
     
-        TinyFrame(){
-            memset(&internal, 0, sizeof(internal));
+        TinyFrame(const TinyFrameConfig_t& config) : 
+                    tfConfig(config), // copy struct
+                    internal({}) // zero initialization
+        { 
         };
+        TinyFrame() : TinyFrame(TF_CONFIG_DEFAULT){ };
+
         ~TinyFrame() = default;
 
         /* --- Callback types --- */
@@ -78,6 +81,8 @@ class TinyFrame{
         struct TF_GenericListener_ {
             TF_Listener fn;
         };
+
+        const TinyFrameConfig_t tfConfig;
 
         struct{
             /* Public user data */
@@ -138,7 +143,7 @@ class TinyFrame{
          */
         static inline void TF_ClearMsg(TF_Msg *msg)
         {
-            memset(msg, 0, sizeof(TF_Msg));
+            msg = {};
         }
 
         // ---------------------------------- API CALLS --------------------------------------
@@ -851,7 +856,7 @@ template<TF_CKSUM_t TF_CKSUM_TYPE>
 void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
 {
     // Parser timeout - clear
-    if (this->internal.parser_timeout_ticks >= TF_PARSER_TIMEOUT_TICKS) {
+    if (this->internal.parser_timeout_ticks >= this->tfConfig.TF_PARSER_TIMEOUT_TICKS) {
         if (this->internal.state != TFState_SOF) {
             TF_ResetParser(this);
             TF_Error("Parser timeout");
@@ -863,8 +868,8 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
 // This is a little dirty, but makes the code easier to read. It's used like e.g. if(),
 // the body is run only after the entire number (of data type 'type') was received
 // and stored to 'dest'
-#define COLLECT_NUMBER(dest, type) dest = (type)(((dest) << 8) | c); \
-                                   if (++this->internal.rxi == sizeof(type))
+#define COLLECT_NUMBER(dest, type, typesize) dest = (type)(((dest) << 8) | c); \
+                                   if (++this->internal.rxi == typesize)
 
 #if !TF_USE_SOF_BYTE
     if (this->internal.state == TFState_SOF) {
@@ -875,14 +880,14 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
     //@formatter:off
     switch (this->internal.state) {
         case TFState_SOF:
-            if (c == TF_SOF_BYTE) {
+            if (c == this->tfConfig.TF_SOF_BYTE) {
                 pars_begin_frame(this);
             }
             break;
 
         case TFState_ID:
             this->internal.cksum = TF_CksumAdd<TF_CKSUM_TYPE>(this->internal.cksum, c); // CKSUM_ADD
-            COLLECT_NUMBER(this->internal.id, TF_ID) {
+            COLLECT_NUMBER(this->internal.id, TF_ID, this->tfConfig.TF_ID_BYTES) {
                 // Enter LEN state
                 this->internal.state = TFState_LEN;
                 this->internal.rxi = 0;
@@ -891,7 +896,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
 
         case TFState_LEN:
             this->internal.cksum = TF_CksumAdd<TF_CKSUM_TYPE>(this->internal.cksum, c); // CKSUM_ADD
-            COLLECT_NUMBER(this->internal.len, TF_LEN) {
+            COLLECT_NUMBER(this->internal.len, TF_LEN, this->tfConfig.TF_LEN_BYTES) {
                 // Enter TYPE state
                 this->internal.state = TFState_TYPE;
                 this->internal.rxi = 0;
@@ -900,7 +905,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
 
         case TFState_TYPE:
             this->internal.cksum = TF_CksumAdd<TF_CKSUM_TYPE>(this->internal.cksum,  c); // CKSUM_ADD
-            COLLECT_NUMBER(this->internal.type, TF_TYPE) {
+            COLLECT_NUMBER(this->internal.type, TF_TYPE, this->tfConfig.TF_TYPE_BYTES) {
                 #if TF_CKSUM_TYPE == TF_CKSUM_NONE
                     this->internal.state = TFState_DATA;
                     this->internal.rxi = 0;
@@ -914,7 +919,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
             break;
 
         case TFState_HEAD_CKSUM:
-            COLLECT_NUMBER(this->internal.ref_cksum, TF_CKSUM<TF_CKSUM_TYPE>) {
+            COLLECT_NUMBER(this->internal.ref_cksum, TF_CKSUM<TF_CKSUM_TYPE>, sizeof(TF_CKSUM<TF_CKSUM_TYPE>)) {
                 // Check the header checksum against the computed value
                 this->internal.cksum = TF_CksumEnd<TF_CKSUM_TYPE>(this->internal.cksum);
 
@@ -969,7 +974,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
             break;
 
         case TFState_DATA_CKSUM:
-            COLLECT_NUMBER(this->internal.ref_cksum, TF_CKSUM<TF_CKSUM_TYPE>) {
+            COLLECT_NUMBER(this->internal.ref_cksum, TF_CKSUM<TF_CKSUM_TYPE>, sizeof(TF_CKSUM<TF_CKSUM_TYPE>)) {
                 // Check the header checksum against the computed value
                 this->internal.cksum = TF_CksumEnd<TF_CKSUM_TYPE>(this->internal.cksum); // CKSUM_FINALIZE
                 if (!this->internal.discard_data) {
@@ -1349,7 +1354,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Tick()
     TF_IdListener_ *lst;
 
     // increment parser timeout (timeout is handled when receiving next byte)
-    if (this->internal.parser_timeout_ticks < TF_PARSER_TIMEOUT_TICKS) {
+    if (this->internal.parser_timeout_ticks < this->tfConfig.TF_PARSER_TIMEOUT_TICKS) {
         this->internal.parser_timeout_ticks++;
     }
 
