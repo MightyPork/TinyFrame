@@ -13,14 +13,16 @@ typedef uint8_t TF_COUNT;
 
 
 // Checksum type (0 = none, 8 = ~XOR, 16 = CRC16 0x8005, 32 = CRC32)
-#define TF_CKSUM_NONE  0  // no checksums
-#define TF_CKSUM_XOR   8  // inverted xor of all payload bytes
-#define TF_CKSUM_CRC8  9  // Dallas/Maxim CRC8 (1-wire)
-#define TF_CKSUM_CRC16 16 // CRC16 with the polynomial 0x8005 (x^16 + x^15 + x^2 + 1)
-#define TF_CKSUM_CRC32 32 // CRC32 with the polynomial 0xedb88320
-#define TF_CKSUM_CUSTOM8  1  // Custom 8-bit checksum
-#define TF_CKSUM_CUSTOM16 2  // Custom 16-bit checksum
-#define TF_CKSUM_CUSTOM32 3  // Custom 32-bit checksum
+enum class TF_CKSUM_t{
+    NONE     = 0,  // no checksums
+    CUSTOM8  = 1,  // Custom 8-bit checksum
+    CUSTOM16 = 2,  // Custom 16-bit checksum
+    CUSTOM32 = 3,  // Custom 32-bit checksum
+    XOR      = 8,  // inverted xor of all payload bytes
+    CRC8     = 9,  // Dallas/Maxim CRC8 (1-wire)
+    CRC16    = 16, // CRC16 with the polynomial 0x8005 (x^16 + x^15 + x^2 + 1)
+    CRC32    = 32, // CRC32 with the polynomial 0xedb88320
+};
 
 //region Resolve data types
 
@@ -62,19 +64,23 @@ typedef uint8_t TF_COUNT;
     #error Bad value of TF_ID_BYTES, must be 1, 2 or 4
 #endif
 
+template <TF_CKSUM_t TF_CKSUM_TYPE>
+struct CKSUM_TYPE_MAP;
 
-#if (TF_CKSUM_TYPE == TF_CKSUM_XOR) || (TF_CKSUM_TYPE == TF_CKSUM_NONE) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM8) || (TF_CKSUM_TYPE == TF_CKSUM_CRC8)
-    // ~XOR (if 0, still use 1 byte - it won't be used)
-    typedef uint8_t TF_CKSUM;
-#elif (TF_CKSUM_TYPE == TF_CKSUM_CRC16) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM16)
-    // CRC16
-    typedef uint16_t TF_CKSUM;
-#elif (TF_CKSUM_TYPE == TF_CKSUM_CRC32) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM32)
-    // CRC32
-    typedef uint32_t TF_CKSUM;
-#else
-    #error Bad value for TF_CKSUM_TYPE
-#endif
+template <> struct CKSUM_TYPE_MAP<TF_CKSUM_t::NONE> {using type = uint8_t;};
+template <> struct CKSUM_TYPE_MAP<TF_CKSUM_t::XOR> {using type = uint8_t;};
+template <> struct CKSUM_TYPE_MAP<TF_CKSUM_t::CUSTOM8> {using type = uint8_t;};
+template <> struct CKSUM_TYPE_MAP<TF_CKSUM_t::CRC8> {using type = uint8_t;};
+
+template <> struct CKSUM_TYPE_MAP<TF_CKSUM_t::CRC16> {using type = uint16_t;};
+template <> struct CKSUM_TYPE_MAP<TF_CKSUM_t::CUSTOM16> {using type = uint16_t;};
+
+template <> struct CKSUM_TYPE_MAP<TF_CKSUM_t::CRC32> {using type = uint32_t;};
+template <> struct CKSUM_TYPE_MAP<TF_CKSUM_t::CUSTOM32> {using type = uint32_t;};
+
+
+template<TF_CKSUM_t TF_CKSUM_TYPE>
+using TF_CKSUM = typename CKSUM_TYPE_MAP<TF_CKSUM_TYPE>::type;
 
 //endregion
 
@@ -138,7 +144,6 @@ struct TF_Msg{
 
 };
 
-class TinyFrame; // forward delcaration, used as pointer for the Listener
 
 /* --- Callbacks --- */
 // This is publicly visible only to allow static init.
@@ -149,7 +154,7 @@ class TinyFrame; // forward delcaration, used as pointer for the Listener
  * @param msg - the received message, userdata is populated inside the object
  * @return listener result
  */
-typedef TF_Result (*TF_Listener)(TinyFrame *tf, TF_Msg *msg);
+typedef TF_Result (*TF_Listener)(TinyFrame<> *tf, TF_Msg *msg);
 
 /**
  * TinyFrame Type Listener callback

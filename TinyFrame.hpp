@@ -23,6 +23,12 @@ namespace TinyFrame_n{
 #define TF_VERSION "2.3.0"
 
 /** TinyFrame class */
+
+// Checksum type. Options:
+//   TF_CKSUM_NONE, TF_CKSUM_XOR, TF_CKSUM_CRC8, TF_CKSUM_CRC16, TF_CKSUM_CRC32
+//   TF_CKSUM_CUSTOM8, TF_CKSUM_CUSTOM16, TF_CKSUM_CUSTOM32
+// Custom checksums require you to implement checksum functions (see TinyFrame.h)
+template<TF_CKSUM_t TF_CKSUM_TYPE>
 class TinyFrame{
 
     public:
@@ -50,8 +56,8 @@ class TinyFrame{
             TF_LEN len;             //!< Payload length
             uint8_t data[TF_MAX_PAYLOAD_RX]; //!< Data byte buffer
             TF_LEN rxi;             //!< Field size byte counter
-            TF_CKSUM cksum;         //!< Checksum calculated of the data stream
-            TF_CKSUM ref_cksum;     //!< Reference checksum read from the message
+            TF_CKSUM<TF_CKSUM_TYPE> cksum;         //!< Checksum calculated of the data stream
+            TF_CKSUM<TF_CKSUM_TYPE> ref_cksum;     //!< Reference checksum read from the message
             TF_TYPE type;           //!< Collected message type number
             bool discard_data;      //!< Set if (len > TF_MAX_PAYLOAD) to read the frame, but ignore the data.
 
@@ -61,7 +67,7 @@ class TinyFrame{
 
             uint32_t tx_pos;        //!< Next write position in the Tx buffer (used for multipart)
             uint32_t tx_len;        //!< Total expected Tx length
-            TF_CKSUM tx_cksum;      //!< Transmit checksum accumulator
+            TF_CKSUM<TF_CKSUM_TYPE> tx_cksum;      //!< Transmit checksum accumulator
 
         #if !TF_USE_MUTEX
             bool soft_lock;         //!< Tx lock flag used if the mutex feature is not enabled.
@@ -384,35 +390,6 @@ extern void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len);
 
     /** Free the TX interface after composing and sending a frame */
     extern void TF_ReleaseTx(TinyFrame *tf);
-
-#endif
-
-// Custom checksum functions
-#if (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM8) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM16) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM32)
-
-    /**
-     * Initialize a checksum
-     *
-     * @return initial checksum value
-     */
-    extern TF_CKSUM TF_CksumStart(void);
-
-    /**
-     * Update a checksum with a byte
-     *
-     * @param cksum - previous checksum value
-     * @param byte - byte to add
-     * @return updated checksum value
-     */
-    extern TF_CKSUM TF_CksumAdd(TF_CKSUM cksum, uint8_t byte);
-
-    /**
-     * Finalize the checksum calculation
-     *
-     * @param cksum - previous checksum value
-     * @return final checksum value
-     */
-    extern TF_CKSUM TF_CksumEnd(TF_CKSUM cksum);
 
 #endif
 
