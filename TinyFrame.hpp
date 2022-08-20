@@ -257,7 +257,7 @@ class TinyFrame{
          * @param msg - message struct. ID is stored in the frame_id field
          * @return success
          */
-        bool TF_Send(TinyFrame *tf, TF_Msg *msg);
+        bool TF_Send(TF_Msg *msg);
 
         /**
          * Like TF_Send, but without the struct
@@ -1045,7 +1045,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(TinyFrame *tf, unsigned char
  * @param type - data type
  * @param num - number to write
  */
-#define WRITENUM_CKSUM(type, num) WRITENUM_BASE(type, num, TF_CksumAdd(cksum, b))
+#define WRITENUM_CKSUM(cksumtype, type, num) WRITENUM_BASE(type, num, TF_CksumAdd<cksumtype>(cksum, b))
 
 /**
  * Compose a frame (used internally by TF_Send and TF_Respond).
@@ -1089,9 +1089,9 @@ uint32_t _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_ComposeHead(TinyFrame *tf, uint8_t 
     cksum = TF_CksumAdd<TF_CKSUM_TYPE>(cksum, TF_SOF_BYTE); // CKSUM_ADD
 #endif
 
-    WRITENUM_CKSUM(TF_ID, id);
-    WRITENUM_CKSUM(TF_LEN, msg->len);
-    WRITENUM_CKSUM(TF_TYPE, msg->type);
+    WRITENUM_CKSUM(TF_CKSUM_TYPE, TF_ID, id);
+    WRITENUM_CKSUM(TF_CKSUM_TYPE, TF_LEN, msg->len);
+    WRITENUM_CKSUM(TF_CKSUM_TYPE, TF_TYPE, msg->type);
 
 #if TF_CKSUM_TYPE != TF_CKSUM_NONE
     CKSUM_FINALIZE(cksum);
@@ -1265,9 +1265,9 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendFrame(TinyFrame *tf, TF_Msg *msg, T
 
 /** send without listener */
 template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Send(TinyFrame *tf, TF_Msg *msg)
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Send(TF_Msg *msg)
 {
-    return TF_SendFrame(tf, msg, nullptr, nullptr, 0);
+    return TF_SendFrame(this, msg, nullptr, nullptr, 0);
 }
 
 /** send without listener and struct */
@@ -1279,7 +1279,7 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendSimple(TinyFrame *tf, TF_TYPE type,
     msg.type = type;
     msg.data = data;
     msg.len = len;
-    return TF_Send(tf, &msg);
+    return tf->TF_Send(&msg);
 }
 
 /** send with a listener waiting for a reply, without the struct */
@@ -1306,7 +1306,7 @@ template<TF_CKSUM_t TF_CKSUM_TYPE>
 bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Respond(TinyFrame *tf, TF_Msg *msg)
 {
     msg->is_response = true;
-    return TF_Send(tf, msg);
+    return tf->TF_Send(msg);
 }
 
 //endregion Sending API funcs
@@ -1317,7 +1317,7 @@ template<TF_CKSUM_t TF_CKSUM_TYPE>
 bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Send_Multipart(TinyFrame *tf, TF_Msg *msg)
 {
     msg->data = nullptr;
-    return TF_Send(tf, msg);
+    return tf->TF_Send(msg);
 }
 
 template<TF_CKSUM_t TF_CKSUM_TYPE>
