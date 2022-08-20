@@ -398,9 +398,9 @@ void _TF_FN TinyFrame::TF_ResetParser(TinyFrame *tf)
 /** SOF was received - prepare for the frame */
 void _TF_FN TinyFrame::pars_begin_frame(TinyFrame *tf) {
     // Reset state vars
-    CKSUM_RESET(tf->internal.cksum);
+    tf->internal.cksum = TF_CksumStart<TF_CKSUM_TYPE>(); // CKSUM_RESET
 #if TF_USE_SOF_BYTE
-    CKSUM_ADD(tf->internal.cksum, TF_SOF_BYTE);
+    tf->internal.cksum = TF_CksumAdd<TF_CKSUM_TYPE>(tf->internal.cksum, TF_SOF_BYTE); // CKSUM_ADD
 #endif
 
     tf->internal.discard_data = false;
@@ -444,7 +444,7 @@ void _TF_FN TinyFrame::TF_AcceptChar(TinyFrame *tf, unsigned char c)
             break;
 
         case TFState_ID:
-            CKSUM_ADD(tf->internal.cksum, c);
+            tf->internal.cksum = TF_CksumAdd<TF_CKSUM_TYPE>(tf->internal.cksum, c); // CKSUM_ADD
             COLLECT_NUMBER(tf->internal.id, TF_ID) {
                 // Enter LEN state
                 tf->internal.state = TFState_LEN;
@@ -453,7 +453,7 @@ void _TF_FN TinyFrame::TF_AcceptChar(TinyFrame *tf, unsigned char c)
             break;
 
         case TFState_LEN:
-            CKSUM_ADD(tf->internal.cksum, c);
+            tf->internal.cksum = TF_CksumAdd<TF_CKSUM_TYPE>(tf->internal.cksum, c); // CKSUM_ADD
             COLLECT_NUMBER(tf->internal.len, TF_LEN) {
                 // Enter TYPE state
                 tf->internal.state = TFState_TYPE;
@@ -462,7 +462,7 @@ void _TF_FN TinyFrame::TF_AcceptChar(TinyFrame *tf, unsigned char c)
             break;
 
         case TFState_TYPE:
-            CKSUM_ADD(tf->internal.cksum, c);
+            tf->internal.cksum = TF_CksumAdd<TF_CKSUM_TYPE>(tf->internal.cksum,  c); // CKSUM_ADD
             COLLECT_NUMBER(tf->internal.type, TF_TYPE) {
                 #if TF_CKSUM_TYPE == TF_CKSUM_NONE
                     tf->internal.state = TFState_DATA;
@@ -477,9 +477,9 @@ void _TF_FN TinyFrame::TF_AcceptChar(TinyFrame *tf, unsigned char c)
             break;
 
         case TFState_HEAD_CKSUM:
-            COLLECT_NUMBER(tf->internal.ref_cksum, TF_CKSUM) {
+            COLLECT_NUMBER(tf->internal.ref_cksum, TF_CKSUM<TF_CKSUM_TYPE>) {
                 // Check the header checksum against the computed value
-                CKSUM_FINALIZE(tf->internal.cksum);
+                tf->internal.cksum = TF_CksumEnd<TF_CKSUM_TYPE>(tf->internal.cksum);
 
                 if (tf->internal.cksum != tf->internal.ref_cksum) {
                     TF_Error("Rx head cksum mismatch");
@@ -498,8 +498,9 @@ void _TF_FN TinyFrame::TF_AcceptChar(TinyFrame *tf, unsigned char c)
                 tf->internal.state = TFState_DATA;
                 tf->internal.rxi = 0;
 
-                CKSUM_RESET(tf->internal.cksum); // Start collecting the payload
+                tf->internal.cksum = TF_CksumStart<TF_CKSUM_TYPE>(); // CKSUM_RESET
 
+                //Start collecting the payload
                 if (tf->internal.len > TF_MAX_PAYLOAD_RX) {
                     TF_Error("Rx payload too long: %d", (int)tf->internal.len);
                     // ERROR - frame too long. Consume, but do not store.
@@ -512,7 +513,7 @@ void _TF_FN TinyFrame::TF_AcceptChar(TinyFrame *tf, unsigned char c)
             if (tf->internal.discard_data) {
                 tf->internal.rxi++;
             } else {
-                CKSUM_ADD(tf->internal.cksum, c);
+                tf->internal.cksum = TF_CksumAdd<TF_CKSUM_TYPE>(tf->internal.cksum, c); // CKSUM_ADD
                 tf->internal.data[tf->internal.rxi++] = c;
             }
 
@@ -533,7 +534,7 @@ void _TF_FN TinyFrame::TF_AcceptChar(TinyFrame *tf, unsigned char c)
         case TFState_DATA_CKSUM:
             COLLECT_NUMBER(tf->internal.ref_cksum, TF_CKSUM) {
                 // Check the header checksum against the computed value
-                CKSUM_FINALIZE(tf->internal.cksum);
+                tf->internal.cksum = TF_CksumEnd<TF_CKSUM_TYPE>(tf->internal.cksum); // CKSUM_FINALIZE
                 if (!tf->internal.discard_data) {
                     if (tf->internal.cksum == tf->internal.ref_cksum) {
                         TF_HandleReceivedMessage(tf);
@@ -611,7 +612,7 @@ uint32_t _TF_FN TinyFrame::TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF_Ms
 
     (void)cksum; // suppress "unused" warning if checksums are disabled
 
-    CKSUM_RESET(cksum);
+    cksum = TF_CksumStart<TF_CKSUM_TYPE>(); // CKSUM_RESET
 
     // Gen ID
     if (msg->is_response) {
@@ -627,11 +628,11 @@ uint32_t _TF_FN TinyFrame::TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF_Ms
     msg->frame_id = id; // put the resolved ID into the message object for later use
 
     // --- Start ---
-    CKSUM_RESET(cksum);
+    cksum = TF_CksumStart<TF_CKSUM_TYPE>(); // CKSUM_RESET
 
 #if TF_USE_SOF_BYTE
     outbuff[pos++] = TF_SOF_BYTE;
-    CKSUM_ADD(cksum, TF_SOF_BYTE);
+    cksum = TF_CksumAdd<TF_CKSUM_TYPE>(cksum, TF_SOF_BYTE); // CKSUM_ADD
 #endif
 
     WRITENUM_CKSUM(TF_ID, id);
@@ -667,7 +668,7 @@ uint32_t _TF_FN TinyFrame::TF_ComposeBody(uint8_t *outbuff,
     for (i = 0; i < data_len; i++) {
         b = data[i];
         outbuff[pos++] = b;
-        CKSUM_ADD(*cksum, b);
+        *cksum = TF_CksumAdd<TF_CKSUM_TYPE>(*cksum, b); // CKSUM_ADD
     }
 
     return pos;
@@ -717,7 +718,7 @@ bool _TF_FN TinyFrame::TF_SendFrame_Begin(TinyFrame *tf, TF_Msg *msg, TF_Listene
         }
     }
 
-    CKSUM_RESET(tf->internal.tx_cksum);
+    tf->internal.tx_cksum = TF_CksumStart<TF_CKSUM_TYPE>(); // CKSUM_RESET
     return true;
 }
 
