@@ -29,17 +29,29 @@ namespace TinyFrame_n{
 //   TF_CKSUM_NONE, TF_CKSUM_XOR, TF_CKSUM_CRC8, TF_CKSUM_CRC16, TF_CKSUM_CRC32
 //   TF_CKSUM_CUSTOM8, TF_CKSUM_CUSTOM16, TF_CKSUM_CUSTOM32
 // Custom checksums require you to implement checksum functions (see TinyFrame.h)
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-class TinyFrame{
 
+template<
+// Checksum Calculation Method
+TF_CKSUM_t TF_CKSUM_TYPE=TF_CKSUM_t::CRC8,
+// Maximum received payload size (static buffer)
+// Larger payloads will be rejected.
+size_t TF_MAX_PAYLOAD_RX=1024,
+// Size of the sending buffer. Larger payloads will be split to pieces and sent
+// in multiple calls to the write function. This can be lowered to reduce RAM usage.
+size_t TF_SENDBUF_LEN=128
+>
+class TinyFrame{
     public:
-    
-        TinyFrame(const TinyFrameConfig_t& config) : 
-                    tfConfig(config), // copy struct
+        // forward declaration of constructor argument
+        struct TF_RequiredCallbacks;
+
+        TinyFrame(const TF_RequiredCallbacks& cb, const TinyFrameConfig_t& config) : 
+                    tfCallbacks(cb), // copy callback struct
+                    tfConfig(config), // copy config struct
                     internal({}) // zero initialization
         { 
         };
-        TinyFrame() : TinyFrame(TF_CONFIG_DEFAULT){ };
+        TinyFrame(const TF_RequiredCallbacks& cb) : TinyFrame(cb, TF_CONFIG_DEFAULT){ };
 
         ~TinyFrame() = default;
 
@@ -52,7 +64,7 @@ class TinyFrame{
          * @param msg - the received message, userdata is populated inside the object
          * @return listener result
          */
-        typedef TF_Result (*TF_Listener)(TinyFrame<TF_CKSUM_TYPE> *tf, TF_Msg *msg);
+        typedef TF_Result (*TF_Listener)(TF_Msg *msg);
 
         /**
          * TinyFrame Type Listener callback
@@ -61,7 +73,32 @@ class TinyFrame{
          * @param msg - the received message, userdata is populated inside the object
          * @return listener result
          */
-        typedef TF_Result (*TF_Listener_Timeout)(TinyFrame<TF_CKSUM_TYPE> *tf);
+        typedef TF_Result (*TF_Listener_Timeout)();
+
+        TF_Result (*TF_Callback_Timeout)();
+
+        // ------------------------ TO BE IMPLEMENTED BY USER ------------------------
+
+        const struct TF_RequiredCallbacks{
+            /**
+             * 'Write bytes' function that sends data to UART
+             *
+             * ! Implement this in your application code !
+             */
+            void (*TF_WriteImpl)(const uint8_t *buff, uint32_t len);
+
+            // Mutex functions
+            #if TF_USE_MUTEX
+
+            /** Claim the TX interface before composing and sending a frame */
+            bool (*TF_ClaimTx)();
+
+            /** Free the TX interface after composing and sending a frame */
+            void (*TF_ReleaseTx)();
+
+            #endif
+
+        }tfCallbacks; // callback variable
 
         struct TF_IdListener_ {
             TF_ID id;
@@ -354,8 +391,8 @@ class TinyFrame{
         void _TF_FN pars_begin_frame();
 
         #if !TF_USE_MUTEX
-        bool TF_ClaimTx(TinyFrame *tf)
-        void TF_ReleaseTx(TinyFrame *tf);
+        bool TF_ClaimTx()
+        void TF_ReleaseTx();
         #endif
 
 }; // class TinyFrame
@@ -376,8 +413,8 @@ class TinyFrame{
  * @param peer_bit - peer bit to use for self
  * @return TF instance or nullptr
  */
-template <TF_CKSUM_t TF_CKSUM_TYPE>
-TinyFrame<TF_CKSUM_TYPE> *TF_Init(TF_Peer peer_bit);
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN> *TF_Init(TF_Peer peer_bit);
 
 
 /**
@@ -389,45 +426,22 @@ TinyFrame<TF_CKSUM_TYPE> *TF_Init(TF_Peer peer_bit);
  * @param peer_bit - peer bit to use for self
  * @return success
  */
-template <TF_CKSUM_t TF_CKSUM_TYPE>
-bool TF_InitStatic(TinyFrame<TF_CKSUM_TYPE> *tf, TF_Peer peer_bit);
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool TF_InitStatic(TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN> *tf, TF_Peer peer_bit);
 
 /**
  * De-init the dynamically allocated TF instance
  *
  * @param tf - instance
  */
-template <TF_CKSUM_t TF_CKSUM_TYPE>
-void TF_DeInit(TinyFrame<TF_CKSUM_TYPE> *tf);
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void TF_DeInit(TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN> *tf);
 
 
 
 /**
  * Frame parser internal state.
  */
-
-// ------------------------ TO BE IMPLEMENTED BY USER ------------------------
-
-/**
- * 'Write bytes' function that sends data to UART
- *
- * ! Implement this in your application code !
- */
-template <TF_CKSUM_t TF_CKSUM_TYPE>
-extern void TF_WriteImpl(TinyFrame<TF_CKSUM_TYPE> *tf, const uint8_t *buff, uint32_t len);
-
-// Mutex functions
-#if TF_USE_MUTEX
-
-/** Claim the TX interface before composing and sending a frame */
-template <TF_CKSUM_t TF_CKSUM_TYPE>
-extern bool TF_ClaimTx(TinyFrame<TF_CKSUM_TYPE> *tf);
-
-/** Free the TX interface after composing and sending a frame */
-template <TF_CKSUM_t TF_CKSUM_TYPE>
-extern void TF_ReleaseTx(TinyFrame<TF_CKSUM_TYPE> *tf);
-
-#endif
 
 // Helper macros
 #define TF_MIN(a, b) ((a)<(b)?(a):(b))
@@ -445,7 +459,7 @@ extern void TF_ReleaseTx(TinyFrame<TF_CKSUM_TYPE> *tf);
     // inappropriate use fo the API.
 
     /** Claim the TX interface before composing and sending a frame */
-    bool TinyFrame<TF_CKSUM_TYPE>::TF_ClaimTx(TinyFrame *tf) {
+    bool TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_ClaimTx() {
         if (tf->internal.soft_lock) {
             TF_Error("TF already locked for tx!");
             return false;
@@ -456,7 +470,7 @@ extern void TF_ReleaseTx(TinyFrame<TF_CKSUM_TYPE> *tf);
     }
 
     /** Free the TX interface after composing and sending a frame */
-    void TinyFrame<TF_CKSUM_TYPE>::TF_ReleaseTx(TinyFrame *tf)
+    void TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_ReleaseTx()
     {
         tf->internal.soft_lock = false;
     }
@@ -466,8 +480,8 @@ extern void TF_ReleaseTx(TinyFrame<TF_CKSUM_TYPE> *tf);
 //region Init
 
 /** Init with a user-allocated buffer */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TF_InitStatic(TinyFrame<TF_CKSUM_TYPE> *tf, TF_Peer peer_bit)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TF_InitStatic(TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN> *tf, TF_Peer peer_bit)
 {
     if (tf == nullptr) {
         TF_Error("TF_InitStatic() failed, tf is null.");
@@ -478,7 +492,7 @@ bool _TF_FN TF_InitStatic(TinyFrame<TF_CKSUM_TYPE> *tf, TF_Peer peer_bit)
     uint32_t usertag = tf->internal.usertag;
     void * userdata = tf->internal.userdata;
 
-    TinyFrame<TF_CKSUM_TYPE>* ptr = new((void*)tf) TinyFrame<TF_CKSUM_TYPE>; // placement new
+    TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>* ptr = new((void*)tf) TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>; // placement new
 
     tf->internal.usertag = usertag;
     tf->internal.userdata = userdata;
@@ -488,10 +502,10 @@ bool _TF_FN TF_InitStatic(TinyFrame<TF_CKSUM_TYPE> *tf, TF_Peer peer_bit)
 }
 
 /** Init with malloc */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-TinyFrame<TF_CKSUM_TYPE> * _TF_FN TF_Init(TF_Peer peer_bit)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN> * _TF_FN TF_Init(TF_Peer peer_bit)
 {
-    TinyFrame<TF_CKSUM_TYPE> *tf = new TinyFrame<TF_CKSUM_TYPE>();
+    TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN> *tf = new TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>();
     if (!tf) {
         TF_Error("TF_Init() failed, out of memory.");
         return nullptr;
@@ -502,8 +516,8 @@ TinyFrame<TF_CKSUM_TYPE> * _TF_FN TF_Init(TF_Peer peer_bit)
 }
 
 /** Release the struct */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void TF_DeInit(TinyFrame<TF_CKSUM_TYPE> *tf)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void TF_DeInit(TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN> *tf)
 {
     if (tf == nullptr) return;
     delete(tf);
@@ -515,15 +529,15 @@ void TF_DeInit(TinyFrame<TF_CKSUM_TYPE> *tf)
 //region Listeners
 
 /** Reset ID listener's timeout to the original value */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::renew_id_listener(TF_IdListener_ *lst)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::renew_id_listener(TF_IdListener_ *lst)
 {
     lst->timeout = lst->timeout_max;
 }
 
 /** Notify callback about ID listener's demise & let it free any resources in userdata */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::cleanup_id_listener(TF_COUNT i, TF_IdListener_ *lst)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::cleanup_id_listener(TF_COUNT i, TF_IdListener_ *lst)
 {
     TF_Msg msg;
     if (lst->fn == nullptr) return;
@@ -533,7 +547,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::cleanup_id_listener(TF_COUNT i, TF_IdListe
         msg.userdata = lst->userdata;
         msg.userdata2 = lst->userdata2;
         msg.data = nullptr; // this is a signal that the listener should clean up
-        lst->fn(this, &msg); // return value is ignored here - use TF_STAY or TF_CLOSE
+        lst->fn(&msg); // return value is ignored here - use TF_STAY or TF_CLOSE
     }
 
     lst->fn = nullptr; // Discard listener
@@ -545,8 +559,8 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::cleanup_id_listener(TF_COUNT i, TF_IdListe
 }
 
 /** Clean up Type listener */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::cleanup_type_listener(TF_COUNT i, TF_TypeListener_ *lst)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::cleanup_type_listener(TF_COUNT i, TF_TypeListener_ *lst)
 {
     lst->fn = nullptr; // Discard listener
     if (i == this->internal.count_type_lst - 1) {
@@ -555,8 +569,8 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::cleanup_type_listener(TF_COUNT i, TF_TypeL
 }
 
 /** Clean up Generic listener */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::cleanup_generic_listener(TF_COUNT i, TF_GenericListener_ *lst)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::cleanup_generic_listener(TF_COUNT i, TF_GenericListener_ *lst)
 {
     lst->fn = nullptr; // Discard listener
     if (i == this->internal.count_generic_lst - 1) {
@@ -565,8 +579,8 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::cleanup_generic_listener(TF_COUNT i, TF_Ge
 }
 
 /** Add a new ID listener. Returns 1 on success. */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AddIdListener(TF_Msg *msg, TF_Listener cb, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_AddIdListener(TF_Msg *msg, TF_Listener cb, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     TF_COUNT i;
     TF_IdListener_ *lst;
@@ -592,8 +606,8 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AddIdListener(TF_Msg *msg, TF_Listener 
 }
 
 /** Add a new Type listener. Returns 1 on success. */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AddTypeListener(TF_TYPE frame_type, TF_Listener cb)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_AddTypeListener(TF_TYPE frame_type, TF_Listener cb)
 {
     TF_COUNT i;
     TF_TypeListener_ *lst;
@@ -615,8 +629,8 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AddTypeListener(TF_TYPE frame_type, TF_
 }
 
 /** Add a new Generic listener. Returns 1 on success. */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AddGenericListener(TF_Listener cb)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_AddGenericListener(TF_Listener cb)
 {
     TF_COUNT i;
     TF_GenericListener_ *lst;
@@ -637,8 +651,8 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AddGenericListener(TF_Listener cb)
 }
 
 /** Remove a ID listener by its frame ID. Returns 1 on success. */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_RemoveIdListener(TF_ID frame_id)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_RemoveIdListener(TF_ID frame_id)
 {
     TF_COUNT i;
     TF_IdListener_ *lst;
@@ -656,8 +670,8 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_RemoveIdListener(TF_ID frame_id)
 }
 
 /** Remove a type listener by its type. Returns 1 on success. */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_RemoveTypeListener(TF_TYPE type)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_RemoveTypeListener(TF_TYPE type)
 {
     TF_COUNT i;
     TF_TypeListener_ *lst;
@@ -675,8 +689,8 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_RemoveTypeListener(TF_TYPE type)
 }
 
 /** Remove a generic listener by its function pointer. Returns 1 on success. */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_RemoveGenericListener(TF_Listener cb)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_RemoveGenericListener(TF_Listener cb)
 {
     TF_COUNT i;
     TF_GenericListener_ *lst;
@@ -694,8 +708,8 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_RemoveGenericListener(TF_Listener cb)
 }
 
 /** Handle a message that was just collected & verified by the parser */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_HandleReceivedMessage()
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_HandleReceivedMessage()
 {
     TF_COUNT i;
     TF_IdListener_ *ilst;
@@ -724,7 +738,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_HandleReceivedMessage()
         if (ilst->fn && ilst->id == msg.frame_id) {
             msg.userdata = ilst->userdata; // pass userdata pointer to the callback
             msg.userdata2 = ilst->userdata2;
-            res = ilst->fn(this, &msg);
+            res = ilst->fn(&msg);
             ilst->userdata = msg.userdata; // put it back (may have changed the pointer or set to nullptr)
             ilst->userdata2 = msg.userdata2; // put it back (may have changed the pointer or set to nullptr)
 
@@ -753,7 +767,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_HandleReceivedMessage()
         tlst = &this->internal.type_listeners[i];
 
         if (tlst->fn && tlst->type == msg.type) {
-            res = tlst->fn(this, &msg);
+            res = tlst->fn(&msg);
 
             if (res != TF_NEXT) {
                 // type listeners don't have userdata.
@@ -772,7 +786,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_HandleReceivedMessage()
         glst = &this->internal.generic_listeners[i];
 
         if (glst->fn) {
-            res = glst->fn(this, &msg);
+            res = glst->fn(&msg);
 
             if (res != TF_NEXT) {
                 // generic listeners don't have userdata.
@@ -794,8 +808,8 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_HandleReceivedMessage()
 }
 
 /** Externally renew an ID listener */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_RenewIdListener(TF_ID id)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_RenewIdListener(TF_ID id)
 {
     TF_COUNT i;
     TF_IdListener_ *lst;
@@ -818,8 +832,8 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_RenewIdListener(TF_ID id)
 //region Parser
 
 /** Handle a received byte buffer */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Accept(const uint8_t *buffer, uint32_t count)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_Accept(const uint8_t *buffer, uint32_t count)
 {
     uint32_t i;
     for (i = 0; i < count; i++) {
@@ -828,16 +842,16 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Accept(const uint8_t *buffer, uint32_t 
 }
 
 /** Reset the parser's internal state. */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_ResetParser()
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_ResetParser()
 {
     this->internal.state = TFState_SOF;
     // more init will be done by the parser when the first byte is received
 }
 
 /** SOF was received - prepare for the frame */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::pars_begin_frame() {
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::pars_begin_frame() {
     // Reset state vars
     this->internal.cksum = TF_CksumStart<TF_CKSUM_TYPE>(); // CKSUM_RESET
 #if TF_USE_SOF_BYTE
@@ -852,13 +866,13 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::pars_begin_frame() {
 }
 
 /** Handle a received char - here's the main state machine */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_AcceptChar(unsigned char c)
 {
     // Parser timeout - clear
     if (this->internal.parser_timeout_ticks >= this->tfConfig.TF_PARSER_TIMEOUT_TICKS) {
         if (this->internal.state != TFState_SOF) {
-            TF_ResetParser(this);
+            this->TF_ResetParser();
             TF_Error("Parser timeout");
         }
     }
@@ -873,7 +887,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
 
 #if !TF_USE_SOF_BYTE
     if (this->internal.state == TFState_SOF) {
-        pars_begin_frame(this);
+        this->pars_begin_frame();
     }
 #endif
 
@@ -881,7 +895,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
     switch (this->internal.state) {
         case TFState_SOF:
             if (c == this->tfConfig.TF_SOF_BYTE) {
-                pars_begin_frame(this);
+                this->pars_begin_frame();
             }
             break;
 
@@ -925,14 +939,14 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
 
                 if (this->internal.cksum != this->internal.ref_cksum) {
                     TF_Error("Rx head cksum mismatch");
-                    TF_ResetParser(this);
+                    this->TF_ResetParser();
                     break;
                 }
 
                 if (this->internal.len == 0) {
                     // if the message has no body, we're done.
-                    TF_HandleReceivedMessage(this);
-                    TF_ResetParser(this);
+                    this->TF_HandleReceivedMessage();
+                    this->TF_ResetParser();
                     break;
                 }
 
@@ -962,8 +976,8 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
             if (this->internal.rxi == this->internal.len) {
                 #if TF_CKSUM_TYPE == TF_CKSUM_NONE
                     // All done
-                    TF_HandleReceivedMessage(this);
-                    TF_ResetParser(this);
+                    this->TF_HandleReceivedMessage();
+                    this->TF_ResetParser();
                 #else
                     // Enter DATA_CKSUM state
                     this->internal.state = TFState_DATA_CKSUM;
@@ -979,13 +993,13 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
                 this->internal.cksum = TF_CksumEnd<TF_CKSUM_TYPE>(this->internal.cksum); // CKSUM_FINALIZE
                 if (!this->internal.discard_data) {
                     if (this->internal.cksum == this->internal.ref_cksum) {
-                        TF_HandleReceivedMessage(this);
+                        this->TF_HandleReceivedMessage();
                     } else {
                         TF_Error("Body cksum mismatch");
                     }
                 }
 
-                TF_ResetParser(this);
+                this->TF_ResetParser();
             }
             break;
     }
@@ -1044,8 +1058,8 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_AcceptChar(unsigned char c)
  * @param msg - message written to the buffer
  * @return nr of bytes in outbuff used by the frame, 0 on failure
  */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-uint32_t _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_ComposeHead(uint8_t *outbuff, TF_Msg *msg)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+uint32_t _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_ComposeHead(uint8_t *outbuff, TF_Msg *msg)
 {
     int8_t si = 0; // signed small int
     uint8_t b = 0;
@@ -1100,8 +1114,8 @@ uint32_t _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_ComposeHead(uint8_t *outbuff, TF_Ms
  * @param cksum - checksum variable, used for all calls to TF_ComposeBody. Must be reset before first use! (CKSUM_RESET(cksum);)
  * @return nr of bytes in outbuff used
  */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-uint32_t _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_ComposeBody(uint8_t *outbuff,
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+uint32_t _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_ComposeBody(uint8_t *outbuff,
                                     const uint8_t *data, TF_LEN data_len,
                                     TF_CKSUM<TF_CKSUM_TYPE> *cksum)
 {
@@ -1125,8 +1139,8 @@ uint32_t _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_ComposeBody(uint8_t *outbuff,
  * @param cksum - checksum variable used for the body
  * @return nr of bytes in outbuff used
  */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-uint32_t _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_ComposeTail(uint8_t *outbuff, TF_CKSUM<TF_CKSUM_TYPE> *cksum)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+uint32_t _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_ComposeTail(uint8_t *outbuff, TF_CKSUM<TF_CKSUM_TYPE> *cksum)
 {
     int8_t si = 0; // signed small int
     uint8_t b = 0;
@@ -1148,17 +1162,17 @@ uint32_t _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_ComposeTail(uint8_t *outbuff, TF_CK
  * @param timeout - listener timeout ticks, 0 = indefinite
  * @return success (mutex claimed and listener added, if any)
  */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendFrame_Begin(TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_SendFrame_Begin(TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
-    TF_TRY(TF_ClaimTx(this));
+    TF_TRY(this->tfCallbacks.TF_ClaimTx());
 
     this->internal.tx_pos = (uint32_t) this->TF_ComposeHead(this->internal.sendbuf, msg); // frame ID is incremented here if it's not a response
     this->internal.tx_len = msg->len;
 
     if (listener) {
         if(!this->TF_AddIdListener(msg, listener, ftimeout, timeout)) {
-            TF_ReleaseTx(this);
+            this->tfCallbacks.TF_ReleaseTx();
             return false;
         }
     }
@@ -1174,8 +1188,8 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendFrame_Begin(TF_Msg *msg, TF_Listene
  * @param buff - bytes to write
  * @param length - count
  */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendFrame_Chunk(const uint8_t *buff, uint32_t length)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_SendFrame_Chunk(const uint8_t *buff, uint32_t length)
 {
     uint32_t remain;
     uint32_t chunk;
@@ -1191,7 +1205,7 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendFrame_Chunk(const uint8_t *buff, ui
 
         // Flush if the buffer is full
         if (this->internal.tx_pos == TF_SENDBUF_LEN) {
-            TF_WriteImpl(this, (const uint8_t *) this->internal.sendbuf, this->internal.tx_pos);
+            this->tfCallbacks.TF_WriteImpl((const uint8_t *) this->internal.sendbuf, this->internal.tx_pos);
             this->internal.tx_pos = 0;
         }
     }
@@ -1201,14 +1215,14 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendFrame_Chunk(const uint8_t *buff, ui
  * End a multi-part frame. This sends the checksum and releases mutex.
  *
  */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendFrame_End()
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_SendFrame_End()
 {
     // Checksum only if message had a body
     if (this->internal.tx_len > 0) {
         // Flush if checksum wouldn't fit in the buffer
         if (TF_SENDBUF_LEN - this->internal.tx_pos < sizeof(TF_CKSUM<TF_CKSUM_TYPE>)) {
-            TF_WriteImpl(this, (const uint8_t *) this->internal.sendbuf, this->internal.tx_pos);
+            this->tfCallbacks.TF_WriteImpl((const uint8_t *) this->internal.sendbuf, this->internal.tx_pos);
             this->internal.tx_pos = 0;
         }
 
@@ -1216,8 +1230,8 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendFrame_End()
         this->internal.tx_pos += TF_ComposeTail(this->internal.sendbuf + this->internal.tx_pos, &this->internal.tx_cksum);
     }
 
-    TF_WriteImpl(this, (const uint8_t *) this->internal.sendbuf, this->internal.tx_pos);
-    TF_ReleaseTx(this);
+    this->tfCallbacks.TF_WriteImpl((const uint8_t *) this->internal.sendbuf, this->internal.tx_pos);
+    this->tfCallbacks.TF_ReleaseTx();
 }
 
 /**
@@ -1229,8 +1243,8 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendFrame_End()
  * @param timeout - listener timeout, 0 is none
  * @return true if sent
  */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendFrame(TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_SendFrame(TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     TF_TRY(this->TF_SendFrame_Begin(msg, listener, ftimeout, timeout));
     if (msg->len == 0 || msg->data != nullptr) {
@@ -1249,15 +1263,15 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendFrame(TF_Msg *msg, TF_Listener list
 //region Sending API funcs
 
 /** send without listener */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Send(TF_Msg *msg)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_Send(TF_Msg *msg)
 {
     return this->TF_SendFrame(msg, nullptr, nullptr, 0);
 }
 
 /** send without listener and struct */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendSimple(TF_TYPE type, const uint8_t *data, TF_LEN len)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_SendSimple(TF_TYPE type, const uint8_t *data, TF_LEN len)
 {
     TF_Msg msg;
     TF_ClearMsg(&msg);
@@ -1268,8 +1282,8 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendSimple(TF_TYPE type, const uint8_t 
 }
 
 /** send with a listener waiting for a reply, without the struct */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_QuerySimple(TF_TYPE type, const uint8_t *data, TF_LEN len, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     TF_Msg msg;
     TF_ClearMsg(&msg);
@@ -1280,15 +1294,15 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_QuerySimple(TF_TYPE type, const uint8_t
 }
 
 /** send with a listener waiting for a reply */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Query(TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_Query(TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     return this->TF_SendFrame(msg, listener, ftimeout, timeout);
 }
 
 /** Like TF_Send, but with explicit frame ID (set inside the msg object), use for responses */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Respond(TF_Msg *msg)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_Respond(TF_Msg *msg)
 {
     msg->is_response = true;
     return this->TF_Send(msg);
@@ -1298,47 +1312,47 @@ bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Respond(TF_Msg *msg)
 
 
 //region Sending API funcs - multipart
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Send_Multipart(TF_Msg *msg)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_Send_Multipart(TF_Msg *msg)
 {
     msg->data = nullptr;
     return this->TF_Send(msg);
 }
 
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_SendSimple_Multipart(TF_TYPE type, TF_LEN len)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_SendSimple_Multipart(TF_TYPE type, TF_LEN len)
 {
     return this->TF_SendSimple(type, nullptr, len);
 }
 
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_QuerySimple_Multipart(TF_TYPE type, TF_LEN len, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_QuerySimple_Multipart(TF_TYPE type, TF_LEN len, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     return this->TF_QuerySimple(type, nullptr, len, listener, ftimeout, timeout);
 }
 
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-bool _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Query_Multipart(TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+bool _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_Query_Multipart(TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     msg->data = nullptr;
     return this->TF_Query(msg, listener, ftimeout, timeout);
 }
 
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Respond_Multipart(TF_Msg *msg)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_Respond_Multipart(TF_Msg *msg)
 {
     msg->data = nullptr;
     this->TF_Respond(msg);
 }
 
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Multipart_Payload(const uint8_t *buff, uint32_t length)
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_Multipart_Payload(const uint8_t *buff, uint32_t length)
 {
     this->TF_SendFrame_Chunk(buff, length);
 }
 
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Multipart_Close()
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_Multipart_Close()
 {
     TF_SendFrame_End(this);
 }
@@ -1347,8 +1361,8 @@ void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Multipart_Close()
 
 
 /** Timebase hook - for timeouts */
-template<TF_CKSUM_t TF_CKSUM_TYPE>
-void _TF_FN TinyFrame<TF_CKSUM_TYPE>::TF_Tick()
+template<TF_CKSUM_t TF_CKSUM_TYPE, size_t TF_MAX_PAYLOAD_RX, size_t TF_SENDBUF_LEN>
+void _TF_FN TinyFrame<TF_CKSUM_TYPE, TF_MAX_PAYLOAD_RX, TF_SENDBUF_LEN>::TF_Tick()
 {
     TF_COUNT i;
     TF_IdListener_ *lst;
