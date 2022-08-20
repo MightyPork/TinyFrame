@@ -22,7 +22,7 @@ namespace TinyFrame_n{
     // inappropriate use fo the API.
 
     /** Claim the TX interface before composing and sending a frame */
-    static bool TF_ClaimTx(TinyFrame *tf) {
+    bool TinyFrame::TF_ClaimTx(TinyFrame *tf) {
         if (tf->internal.soft_lock) {
             TF_Error("TF already locked for tx!");
             return false;
@@ -33,7 +33,7 @@ namespace TinyFrame_n{
     }
 
     /** Free the TX interface after composing and sending a frame */
-    static void TF_ReleaseTx(TinyFrame *tf)
+    void TinyFrame::TF_ReleaseTx(TinyFrame *tf)
     {
         tf->internal.soft_lock = false;
     }
@@ -89,13 +89,13 @@ void TF_DeInit(TinyFrame *tf)
 //region Listeners
 
 /** Reset ID listener's timeout to the original value */
-static inline void _TF_FN renew_id_listener(TF_IdListener_ *lst)
+void _TF_FN TinyFrame::renew_id_listener(TF_IdListener_ *lst)
 {
     lst->timeout = lst->timeout_max;
 }
 
 /** Notify callback about ID listener's demise & let it free any resources in userdata */
-static void _TF_FN cleanup_id_listener(TinyFrame *tf, TF_COUNT i, TF_IdListener_ *lst)
+void _TF_FN TinyFrame::cleanup_id_listener(TinyFrame *tf, TF_COUNT i, TF_IdListener_ *lst)
 {
     TF_Msg msg;
     if (lst->fn == nullptr) return;
@@ -117,7 +117,7 @@ static void _TF_FN cleanup_id_listener(TinyFrame *tf, TF_COUNT i, TF_IdListener_
 }
 
 /** Clean up Type listener */
-static inline void _TF_FN cleanup_type_listener(TinyFrame *tf, TF_COUNT i, TF_TypeListener_ *lst)
+void _TF_FN TinyFrame::cleanup_type_listener(TinyFrame *tf, TF_COUNT i, TF_TypeListener_ *lst)
 {
     lst->fn = nullptr; // Discard listener
     if (i == tf->internal.count_type_lst - 1) {
@@ -126,7 +126,7 @@ static inline void _TF_FN cleanup_type_listener(TinyFrame *tf, TF_COUNT i, TF_Ty
 }
 
 /** Clean up Generic listener */
-static inline void _TF_FN cleanup_generic_listener(TinyFrame *tf, TF_COUNT i, TF_GenericListener_ *lst)
+void _TF_FN TinyFrame::cleanup_generic_listener(TinyFrame *tf, TF_COUNT i, TF_GenericListener_ *lst)
 {
     lst->fn = nullptr; // Discard listener
     if (i == tf->internal.count_generic_lst - 1) {
@@ -396,7 +396,7 @@ void _TF_FN TinyFrame::TF_ResetParser(TinyFrame *tf)
 }
 
 /** SOF was received - prepare for the frame */
-static void _TF_FN pars_begin_frame(TinyFrame *tf) {
+void _TF_FN TinyFrame::pars_begin_frame(TinyFrame *tf) {
     // Reset state vars
     CKSUM_RESET(tf->internal.cksum);
 #if TF_USE_SOF_BYTE

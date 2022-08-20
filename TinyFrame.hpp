@@ -299,7 +299,7 @@ class TinyFrame{
 
     private: 
 
-        static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf);
+        void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf);
         uint32_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF_Msg *msg);
         uint32_t _TF_FN TF_ComposeBody(uint8_t *outbuff,
                                             const uint8_t *data, TF_LEN data_len,
@@ -310,6 +310,17 @@ class TinyFrame{
         void _TF_FN TF_SendFrame_End(TinyFrame *tf);
         bool _TF_FN TF_SendFrame(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
+        static void _TF_FN renew_id_listener(TF_IdListener_ *lst);
+        void _TF_FN cleanup_id_listener(TinyFrame *tf, TF_COUNT i, TF_IdListener_ *lst);
+        void _TF_FN cleanup_type_listener(TinyFrame *tf, TF_COUNT i, TF_TypeListener_ *lst);
+        void _TF_FN cleanup_generic_listener(TinyFrame *tf, TF_COUNT i, TF_GenericListener_ *lst);
+
+        void _TF_FN pars_begin_frame(TinyFrame *tf);
+
+        #if !TF_USE_MUTEX
+        bool TF_ClaimTx(TinyFrame *tf)
+        void TF_ReleaseTx(TinyFrame *tf);
+        #endif
 };
 
 
