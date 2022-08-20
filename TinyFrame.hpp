@@ -16,80 +16,11 @@
 #include <cstring>  // for memset()
 //---------------------------------------------------------------------------
 
-#include "TF_Config.hpp"
 #include "TinyFrame_Types.hpp"
 
 namespace TinyFrame_n{
 
 #define TF_VERSION "2.3.0"
-
-// Checksum type (0 = none, 8 = ~XOR, 16 = CRC16 0x8005, 32 = CRC32)
-#define TF_CKSUM_NONE  0  // no checksums
-#define TF_CKSUM_XOR   8  // inverted xor of all payload bytes
-#define TF_CKSUM_CRC8  9  // Dallas/Maxim CRC8 (1-wire)
-#define TF_CKSUM_CRC16 16 // CRC16 with the polynomial 0x8005 (x^16 + x^15 + x^2 + 1)
-#define TF_CKSUM_CRC32 32 // CRC32 with the polynomial 0xedb88320
-#define TF_CKSUM_CUSTOM8  1  // Custom 8-bit checksum
-#define TF_CKSUM_CUSTOM16 2  // Custom 16-bit checksum
-#define TF_CKSUM_CUSTOM32 3  // Custom 32-bit checksum
-
-//region Resolve data types
-
-#if TF_LEN_BYTES == 1
-    typedef uint8_t TF_LEN;
-#elif TF_LEN_BYTES == 2
-    typedef uint16_t TF_LEN;
-#elif TF_LEN_BYTES == 4
-    typedef uint32_t TF_LEN;
-#else
-    #error Bad value of TF_LEN_BYTES, must be 1, 2 or 4
-#endif
-
-// Compatibility with ESP8266 SDK
-#ifdef ICACHE_FLASH_ATTR
-#define _TF_FN ICACHE_FLASH_ATTR
-#else
-#define _TF_FN
-#endif
-
-#if TF_TYPE_BYTES == 1
-    typedef uint8_t TF_TYPE;
-#elif TF_TYPE_BYTES == 2
-    typedef uint16_t TF_TYPE;
-#elif TF_TYPE_BYTES == 4
-    typedef uint32_t TF_TYPE;
-#else
-    #error Bad value of TF_TYPE_BYTES, must be 1, 2 or 4
-#endif
-
-
-#if TF_ID_BYTES == 1
-    typedef uint8_t TF_ID;
-#elif TF_ID_BYTES == 2
-    typedef uint16_t TF_ID;
-#elif TF_ID_BYTES == 4
-    typedef uint32_t TF_ID;
-#else
-    #error Bad value of TF_ID_BYTES, must be 1, 2 or 4
-#endif
-
-
-#if (TF_CKSUM_TYPE == TF_CKSUM_XOR) || (TF_CKSUM_TYPE == TF_CKSUM_NONE) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM8) || (TF_CKSUM_TYPE == TF_CKSUM_CRC8)
-    // ~XOR (if 0, still use 1 byte - it won't be used)
-    typedef uint8_t TF_CKSUM;
-#elif (TF_CKSUM_TYPE == TF_CKSUM_CRC16) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM16)
-    // CRC16
-    typedef uint16_t TF_CKSUM;
-#elif (TF_CKSUM_TYPE == TF_CKSUM_CRC32) || (TF_CKSUM_TYPE == TF_CKSUM_CUSTOM32)
-    // CRC32
-    typedef uint32_t TF_CKSUM;
-#else
-    #error Bad value for TF_CKSUM_TYPE
-#endif
-
-//endregion
-
-//---------------------------------------------------------------------------
 
 /** TinyFrame class */
 class TinyFrame{
@@ -100,75 +31,6 @@ class TinyFrame{
             memset(&internal, 0, sizeof(internal));
         };
         ~TinyFrame() = default;
-
-
-        /** Data structure for sending / receiving messages */
-        struct TF_Msg{
-            TF_ID frame_id;       //!< message ID
-            bool is_response;     //!< internal flag, set when using the Respond function. frame_id is then kept unchanged.
-            TF_TYPE type;         //!< received or sent message type
-
-            /**
-             * Buffer of received data, or data to send.
-             *
-             * - If (data == nullptr) in an ID listener, that means the listener timed out and
-             *   the user should free any userdata and take other appropriate actions.
-             *
-             * - If (data == nullptr) and length is not zero when sending a frame, that starts a multi-part frame.
-             *   This call then must be followed by sending the payload and closing the frame.
-             */
-            const uint8_t *data;
-            TF_LEN len; //!< length of the payload
-
-            /**
-             * Custom user data for the ID listener.
-             *
-             * This data will be stored in the listener slot and passed to the ID callback
-             * via those same fields on the received message.
-             */
-            void *userdata;
-            void *userdata2;
-
-        };
-
-        /* --- Callbacks --- */
-        // This is publicly visible only to allow static init.
-        /**
-         * TinyFrame Type Listener callback
-         *
-         * @param tf - instance
-         * @param msg - the received message, userdata is populated inside the object
-         * @return listener result
-         */
-        typedef TF_Result (*TF_Listener)(TinyFrame *tf, TF_Msg *msg);
-
-        /**
-         * TinyFrame Type Listener callback
-         *
-         * @param tf - instance
-         * @param msg - the received message, userdata is populated inside the object
-         * @return listener result
-         */
-        typedef TF_Result (*TF_Listener_Timeout)(TinyFrame *tf);
-
-        struct TF_IdListener_ {
-            TF_ID id;
-            TF_Listener fn;
-            TF_Listener_Timeout fn_timeout;
-            TF_TICKS timeout;     // nr of ticks remaining to disable this listener
-            TF_TICKS timeout_max; // the original timeout is stored here (0 = no timeout)
-            void *userdata;
-            void *userdata2;
-        };
-
-        struct TF_TypeListener_ {
-            TF_TYPE type;
-            TF_Listener fn;
-        };
-
-        struct TF_GenericListener_ {
-            TF_Listener fn;
-        };
 
         struct{
             /* Public user data */
@@ -227,9 +89,9 @@ class TinyFrame{
          *
          * @param msg - message to clear in-place
          */
-        static inline void TF_ClearMsg(TinyFrame::TF_Msg *msg)
+        static inline void TF_ClearMsg(TF_Msg *msg)
         {
-            memset(msg, 0, sizeof(TinyFrame::TF_Msg));
+            memset(msg, 0, sizeof(TF_Msg));
         }
 
         // ---------------------------------- API CALLS --------------------------------------
@@ -284,7 +146,7 @@ class TinyFrame{
          * @param timeout - timeout in ticks to auto-remove the listener (0 = keep forever)
          * @return slot index (for removing), or TF_ERROR (-1)
          */
-        bool TF_AddIdListener(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener cb, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout);
+        bool TF_AddIdListener(TinyFrame *tf, TF_Msg *msg, TF_Listener cb, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
         /**
          * Remove a listener by the message ID it's registered for
@@ -302,7 +164,7 @@ class TinyFrame{
          * @param cb - callback
          * @return slot index (for removing), or TF_ERROR (-1)
          */
-        bool TF_AddTypeListener(TinyFrame *tf, TF_TYPE frame_type, TinyFrame::TF_Listener cb);
+        bool TF_AddTypeListener(TinyFrame *tf, TF_TYPE frame_type, TF_Listener cb);
 
         /**
          * Remove a listener by type.
@@ -319,7 +181,7 @@ class TinyFrame{
          * @param cb - callback
          * @return slot index (for removing), or TF_ERROR (-1)
          */
-        bool TF_AddGenericListener(TinyFrame *tf, TinyFrame::TF_Listener cb);
+        bool TF_AddGenericListener(TinyFrame *tf, TF_Listener cb);
 
         /**
          * Remove a generic listener by function pointer
@@ -327,7 +189,7 @@ class TinyFrame{
          * @param tf - instance
          * @param cb - callback function to remove
          */
-        bool TF_RemoveGenericListener(TinyFrame *tf, TinyFrame::TF_Listener cb);
+        bool TF_RemoveGenericListener(TinyFrame *tf, TF_Listener cb);
 
         /**
          * Renew an ID listener timeout externally (as opposed to by returning TF_RENEW from the ID listener)
@@ -348,7 +210,7 @@ class TinyFrame{
          * @param msg - message struct. ID is stored in the frame_id field
          * @return success
          */
-        bool TF_Send(TinyFrame *tf, TinyFrame::TF_Msg *msg);
+        bool TF_Send(TinyFrame *tf, TF_Msg *msg);
 
         /**
          * Like TF_Send, but without the struct
@@ -365,15 +227,15 @@ class TinyFrame{
          * @param timeout - listener expiry time in ticks
          * @return success
          */
-        bool TF_Query(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener listener,
-                    TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout);
+        bool TF_Query(TinyFrame *tf, TF_Msg *msg, TF_Listener listener,
+                    TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
         /**
          * Like TF_Query(), but without the struct
          */
         bool TF_QuerySimple(TinyFrame *tf, TF_TYPE type,
                             const uint8_t *data, TF_LEN len,
-                            TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout);
+                            TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
         /**
          * Send a response to a received message.
@@ -382,7 +244,7 @@ class TinyFrame{
          * @param msg - message struct. ID is read from frame_id. set ->renew to reset listener timeout
          * @return success
          */
-        bool TF_Respond(TinyFrame *tf, TinyFrame::TF_Msg *msg);
+        bool TF_Respond(TinyFrame *tf, TF_Msg *msg);
 
 
         // ------------------------ MULTIPART FRAME TX FUNCTIONS -----------------------------
@@ -393,7 +255,7 @@ class TinyFrame{
          * TF_Send() with multipart payload.
          * msg.data is ignored and set to nullptr
          */
-        bool TF_Send_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg);
+        bool TF_Send_Multipart(TinyFrame *tf, TF_Msg *msg);
 
         /**
          * TF_SendSimple() with multipart payload.
@@ -403,19 +265,19 @@ class TinyFrame{
         /**
          * TF_QuerySimple() with multipart payload.
          */
-        bool TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout);
+        bool TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
         /**
          * TF_Query() with multipart payload.
          * msg.data is ignored and set to nullptr
          */
-        bool TF_Query_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout);
+        bool TF_Query_Multipart(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
         /**
          * TF_Respond() with multipart payload.
          * msg.data is ignored and set to nullptr
          */
-        void TF_Respond_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg);
+        void TF_Respond_Multipart(TinyFrame *tf, TF_Msg *msg);
 
         /**
          * Send the payload for a started multipart frame. This can be called multiple times
@@ -438,15 +300,15 @@ class TinyFrame{
     private: 
 
         static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf);
-        uint32_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TinyFrame::TF_Msg *msg);
+        uint32_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF_Msg *msg);
         uint32_t _TF_FN TF_ComposeBody(uint8_t *outbuff,
                                             const uint8_t *data, TF_LEN data_len,
                                             TF_CKSUM *cksum);
         uint32_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum);
-        bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout);
+        bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
         void _TF_FN TF_SendFrame_Chunk(TinyFrame *tf, const uint8_t *buff, uint32_t length);
         void _TF_FN TF_SendFrame_End(TinyFrame *tf);
-        bool _TF_FN TF_SendFrame(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout);
+        bool _TF_FN TF_SendFrame(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
 };
 
