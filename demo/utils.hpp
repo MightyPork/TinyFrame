@@ -8,6 +8,8 @@
 #include <cstdio>
 #include "../TinyFrame.hpp"
 
+namespace TinyFrame_n{
+
 /** pointer to unsigned char */
 typedef unsigned char* pu8;
 
@@ -22,5 +24,7 @@ void dumpFrame(const uint8_t *buff, size_t len);
  * @param msg
  */
 void dumpFrameInfo(TF_Msg *msg);
+
+} // TinyFrame_n
 
 #endif //TF_UTILS_H

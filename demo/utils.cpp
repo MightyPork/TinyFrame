@@ -5,6 +5,8 @@
 #include "utils.hpp"
 #include <cstdio>
 
+namespace TinyFrame_n{
+
 // helper func for testing
 void dumpFrame(const uint8_t *buff, size_t len)
 {
@@ -31,3 +33,4 @@ void dumpFrameInfo(TF_Msg *msg)
                "    id: %Xh\033[0m\n\n",
            msg->type, msg->len, msg->data, msg->len, msg->frame_id);
 }
+} // TinyFrame_n

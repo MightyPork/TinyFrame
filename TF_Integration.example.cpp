@@ -1,5 +1,7 @@
 #include "TinyFrame.hpp"
 
+namespace TinyFrame_n{
+
 /**
  * This is an example of integrating TinyFrame into the application.
  * 
@@ -53,6 +55,8 @@ TF_CKSUM TF_CksumEnd(TF_CKSUM cksum)
 {
     return cksum;
 }
+
+} // TinyFrame_n
 
 int main(){
     

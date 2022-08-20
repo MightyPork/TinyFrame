@@ -4,6 +4,8 @@
 #include <cstdint>  // for uint8_t etc
 //#include <cstddef>  // for nullptr
 
+namespace TinyFrame_n{
+
 typedef uint16_t TF_TICKS;
 typedef uint8_t TF_COUNT;
 
@@ -35,5 +37,7 @@ enum TF_State_ {
     TFState_DATA,         //!< Receive payload
     TFState_DATA_CKSUM    //!< Wait for Checksum
 };
+
+} // TinyFrame_n
 
 #endif // TinyFrame_TypesHPP

@@ -4,9 +4,10 @@
 
 #ifndef TF_CONFIG_H
 #define TF_CONFIG_H
-
 #include <cstdint>
 #include <cstdio>
+
+namespace TinyFrame_n{
 
 #define TF_ID_BYTES     1
 #define TF_LEN_BYTES    2
@@ -22,5 +23,6 @@
 #define TF_PARSER_TIMEOUT_TICKS 10
 
 #define TF_Error(format, ...) printf("[TF] " format "\n", ##__VA_ARGS__)
+}
 
 #endif //TF_CONFIG_H

@@ -1,6 +1,7 @@
 #ifndef TinyFrameH
 #define TinyFrameH
 
+
 /**
  * TinyFrame protocol library
  *
@@ -10,11 +11,17 @@
  * Upstream URL: https://github.com/MightyPork/TinyFrame
  */
 
-#define TF_VERSION "2.3.0"
 
 //---------------------------------------------------------------------------
 #include <cstring>  // for memset()
 //---------------------------------------------------------------------------
+
+#include "TF_Config.hpp"
+#include "TinyFrame_Types.hpp"
+
+namespace TinyFrame_n{
+
+#define TF_VERSION "2.3.0"
 
 // Checksum type (0 = none, 8 = ~XOR, 16 = CRC16 0x8005, 32 = CRC32)
 #define TF_CKSUM_NONE  0  // no checksums
@@ -25,9 +32,6 @@
 #define TF_CKSUM_CUSTOM8  1  // Custom 8-bit checksum
 #define TF_CKSUM_CUSTOM16 2  // Custom 16-bit checksum
 #define TF_CKSUM_CUSTOM32 3  // Custom 32-bit checksum
-
-#include "TF_Config.hpp"
-#include "TinyFrame_Types.hpp"
 
 //region Resolve data types
 
@@ -522,4 +526,6 @@ extern void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len);
 
 #endif
 
-#endif
+} // TinyFrame_n
+
+#endif // TinyFrameH

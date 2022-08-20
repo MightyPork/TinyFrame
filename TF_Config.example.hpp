@@ -11,6 +11,8 @@
 #include <cstdio> // used by the TF_Error() macro defined below
 //#include <esp8266.h> // when using with esphttpd
 
+namespace TinyFrame_n{
+
 //----------------------------- FRAME FORMAT ---------------------------------
 // The format can be adjusted to fit your particular application needs
 
@@ -77,5 +79,5 @@ typedef uint8_t TF_COUNT;
 #define TF_Error(format, ...) printf("[TF] " format "\n", ##__VA_ARGS__)
 
 //------------------------- End of user config ------------------------------
-
+} // TinyFrame_n
 #endif //TF_CONFIG_H

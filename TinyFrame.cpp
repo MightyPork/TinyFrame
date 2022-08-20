@@ -3,6 +3,8 @@
 #include <new> // placement new
 //---------------------------------------------------------------------------
 
+namespace TinyFrame_n{
+
 // Compatibility with ESP8266 SDK
 #ifdef ICACHE_FLASH_ATTR
 #define _TF_FN ICACHE_FLASH_ATTR
@@ -1083,3 +1085,5 @@ void _TF_FN TF_Tick(TinyFrame *tf)
         }
     }
 }
+
+} // TinyFrame_n
