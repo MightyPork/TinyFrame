@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(SOURCE_FILES
         TinyFrame.cpp
         TinyFrame.hpp
+        TinyFrame_CRC.cpp
         TinyFrame_CRC.hpp
         TinyFrame_Types.hpp
         TF_Config.hpp
