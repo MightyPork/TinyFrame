@@ -857,9 +857,9 @@ template<TF_TEMPLATE_ARGS>
 void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::pars_begin_frame() {
     // Reset state vars
     this->internal.cksum = TF_CksumStart<TF_CKSUM_TYPE>(); // CKSUM_RESET
-#if TF_USE_SOF_BYTE
-    this->internal.cksum = TF_CksumAdd<TF_CKSUM_TYPE>(this->internal.cksum, TF_SOF_BYTE); // CKSUM_ADD
-#endif
+    if(this->tfConfig.TF_USE_SOF_BYTE){
+        this->internal.cksum = TF_CksumAdd<TF_CKSUM_TYPE>(this->internal.cksum, this->tfConfig.TF_SOF_BYTE); // CKSUM_ADD
+    }
 
     this->internal.discard_data = false;
 
@@ -888,11 +888,11 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
 #define COLLECT_NUMBER(dest, type, typesize) dest = (type)(((dest) << 8) | c); \
                                    if (++this->internal.rxi == typesize)
 
-#if !TF_USE_SOF_BYTE
-    if (this->internal.state == TFState_SOF) {
-        this->pars_begin_frame();
+    if(!this->tfConfig.TF_USE_SOF_BYTE){
+        if (this->internal.state == TFState_SOF) {
+            this->pars_begin_frame();
+        }
     }
-#endif
 
     //@formatter:off
     switch (this->internal.state) {
@@ -923,15 +923,15 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
         case TFState_TYPE:
             this->internal.cksum = TF_CksumAdd<TF_CKSUM_TYPE>(this->internal.cksum,  c); // CKSUM_ADD
             COLLECT_NUMBER(this->internal.type, TF_TYPE, this->tfConfig.TF_TYPE_BYTES) {
-                #if TF_CKSUM_TYPE == TF_CKSUM_NONE
+                if(TF_CKSUM_TYPE == TF_CKSUM_t::NONE){
                     this->internal.state = TFState_DATA;
                     this->internal.rxi = 0;
-                #else
+                }else{
                     // enter HEAD_CKSUM state
                     this->internal.state = TFState_HEAD_CKSUM;
                     this->internal.rxi = 0;
                     this->internal.ref_cksum = 0;
-                #endif
+                }
             }
             break;
 
@@ -977,16 +977,16 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
             }
 
             if (this->internal.rxi == this->internal.len) {
-                #if TF_CKSUM_TYPE == TF_CKSUM_NONE
+                if(TF_CKSUM_TYPE == TF_CKSUM_t::NONE){
                     // All done
                     this->TF_HandleReceivedMessage();
                     this->TF_ResetParser();
-                #else
+                }else{
                     // Enter DATA_CKSUM state
                     this->internal.state = TFState_DATA_CKSUM;
                     this->internal.rxi = 0;
                     this->internal.ref_cksum = 0;
-                #endif
+                }
             }
             break;
 
@@ -1089,20 +1089,18 @@ uint32_t _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_ComposeHead(uint8_t *outbuff, T
 
     // --- Start ---
     cksum = TF_CksumStart<TF_CKSUM_TYPE>(); // CKSUM_RESET
-
-#if TF_USE_SOF_BYTE
-    outbuff[pos++] = TF_SOF_BYTE;
-    cksum = TF_CksumAdd<TF_CKSUM_TYPE>(cksum, TF_SOF_BYTE); // CKSUM_ADD
-#endif
+    if(this->tfConfig.TF_TYPE_BYTES){
+        outbuff[pos++] = this->tfConfig.TF_SOF_BYTE;
+        cksum = TF_CksumAdd<TF_CKSUM_TYPE>(cksum, this->tfConfig.TF_SOF_BYTE); // CKSUM_ADD
+    }
 
     WRITENUM_CKSUM(TF_CKSUM_TYPE, this->tfConfig.TF_ID_BYTES, id);
     WRITENUM_CKSUM(TF_CKSUM_TYPE, this->tfConfig.TF_LEN_BYTES, msg->len);
     WRITENUM_CKSUM(TF_CKSUM_TYPE, this->tfConfig.TF_TYPE_BYTES, msg->type);
-
-#if TF_CKSUM_TYPE != TF_CKSUM_NONE
-    CKSUM_FINALIZE(cksum);
-    WRITENUM(sizeof(TF_CKSUM<TF_CKSUM_TYPE>), cksum);
-#endif
+    if(TF_CKSUM_TYPE != TF_CKSUM_t::NONE){
+        cksum = TF_CksumEnd<TF_CKSUM_TYPE>(cksum); // CKSUM_FINALIZE
+        WRITENUM(sizeof(TF_CKSUM<TF_CKSUM_TYPE>), cksum);
+    }
 
     return pos;
 }
@@ -1149,10 +1147,10 @@ uint32_t _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_ComposeTail(uint8_t *outbuff, T
     uint8_t b = 0;
     uint32_t pos = 0;
 
-#if TF_CKSUM_TYPE != TF_CKSUM_NONE
-    CKSUM_FINALIZE(*cksum);
-    WRITENUM(sizeof(TF_CKSUM<TF_CKSUM_TYPE>), *cksum);
-#endif
+    if(TF_CKSUM_TYPE != TF_CKSUM_t::NONE){
+        *cksum = TF_CksumEnd<TF_CKSUM_TYPE>(*cksum); // CKSUM_FINALIZE
+        WRITENUM(sizeof(TF_CKSUM<TF_CKSUM_TYPE>), *cksum);
+    }
     return pos;
 }
 
