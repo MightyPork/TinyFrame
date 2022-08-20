@@ -1,7 +1,6 @@
 //---------------------------------------------------------------------------
 #include "TinyFrame.hpp"
-#include <stdlib.h> // - for malloc() if dynamic constructor is used
-#include <new>
+#include <new> // placement new
 //---------------------------------------------------------------------------
 
 // Compatibility with ESP8266 SDK
@@ -214,7 +213,7 @@
 /** Init with a user-allocated buffer */
 bool _TF_FN TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit)
 {
-    if (tf == NULL) {
+    if (tf == nullptr) {
         TF_Error("TF_InitStatic() failed, tf is null.");
         return false;
     }
@@ -238,7 +237,7 @@ TinyFrame * _TF_FN TF_Init(TF_Peer peer_bit)
     TinyFrame *tf = new TinyFrame();
     if (!tf) {
         TF_Error("TF_Init() failed, out of memory.");
-        return NULL;
+        return nullptr;
     }
 
     TF_InitStatic(tf, peer_bit);
@@ -248,8 +247,8 @@ TinyFrame * _TF_FN TF_Init(TF_Peer peer_bit)
 /** Release the struct */
 void TF_DeInit(TinyFrame *tf)
 {
-    if (tf == NULL) return;
-    free(tf);
+    if (tf == nullptr) return;
+    delete(tf);
 }
 
 //endregion Init
@@ -267,18 +266,18 @@ static inline void _TF_FN renew_id_listener(TinyFrame::TF_IdListener_ *lst)
 static void _TF_FN cleanup_id_listener(TinyFrame *tf, TF_COUNT i, TinyFrame::TF_IdListener_ *lst)
 {
     TinyFrame::TF_Msg msg;
-    if (lst->fn == NULL) return;
+    if (lst->fn == nullptr) return;
 
-    // Make user clean up their data - only if not NULL
-    if (lst->userdata != NULL || lst->userdata2 != NULL) {
+    // Make user clean up their data - only if not nullptr
+    if (lst->userdata != nullptr || lst->userdata2 != nullptr) {
         msg.userdata = lst->userdata;
         msg.userdata2 = lst->userdata2;
-        msg.data = NULL; // this is a signal that the listener should clean up
+        msg.data = nullptr; // this is a signal that the listener should clean up
         lst->fn(tf, &msg); // return value is ignored here - use TF_STAY or TF_CLOSE
     }
 
-    lst->fn = NULL; // Discard listener
-    lst->fn_timeout = NULL;
+    lst->fn = nullptr; // Discard listener
+    lst->fn_timeout = nullptr;
 
     if (i == tf->internal.count_id_lst - 1) {
         tf->internal.count_id_lst--;
@@ -288,7 +287,7 @@ static void _TF_FN cleanup_id_listener(TinyFrame *tf, TF_COUNT i, TinyFrame::TF_
 /** Clean up Type listener */
 static inline void _TF_FN cleanup_type_listener(TinyFrame *tf, TF_COUNT i, TinyFrame::TF_TypeListener_ *lst)
 {
-    lst->fn = NULL; // Discard listener
+    lst->fn = nullptr; // Discard listener
     if (i == tf->internal.count_type_lst - 1) {
         tf->internal.count_type_lst--;
     }
@@ -297,7 +296,7 @@ static inline void _TF_FN cleanup_type_listener(TinyFrame *tf, TF_COUNT i, TinyF
 /** Clean up Generic listener */
 static inline void _TF_FN cleanup_generic_listener(TinyFrame *tf, TF_COUNT i, TinyFrame::TF_GenericListener_ *lst)
 {
-    lst->fn = NULL; // Discard listener
+    lst->fn = nullptr; // Discard listener
     if (i == tf->internal.count_generic_lst - 1) {
         tf->internal.count_generic_lst--;
     }
@@ -311,7 +310,7 @@ bool _TF_FN TF_AddIdListener(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::T
     for (i = 0; i < TF_MAX_ID_LST; i++) {
         lst = &tf->internal.id_listeners[i];
         // test for empty slot
-        if (lst->fn == NULL) {
+        if (lst->fn == nullptr) {
             lst->fn = cb;
             lst->fn_timeout = ftimeout;
             lst->id = msg->frame_id;
@@ -337,7 +336,7 @@ bool _TF_FN TF_AddTypeListener(TinyFrame *tf, TF_TYPE frame_type, TinyFrame::TF_
     for (i = 0; i < TF_MAX_TYPE_LST; i++) {
         lst = &tf->internal.type_listeners[i];
         // test for empty slot
-        if (lst->fn == NULL) {
+        if (lst->fn == nullptr) {
             lst->fn = cb;
             lst->type = frame_type;
             if (i >= tf->internal.count_type_lst) {
@@ -359,7 +358,7 @@ bool _TF_FN TF_AddGenericListener(TinyFrame *tf, TinyFrame::TF_Listener cb)
     for (i = 0; i < TF_MAX_GEN_LST; i++) {
         lst = &tf->internal.generic_listeners[i];
         // test for empty slot
-        if (lst->fn == NULL) {
+        if (lst->fn == nullptr) {
             lst->fn = cb;
             if (i >= tf->internal.count_generic_lst) {
                 tf->internal.count_generic_lst = (TF_COUNT) (i + 1);
@@ -380,7 +379,7 @@ bool _TF_FN TF_RemoveIdListener(TinyFrame *tf, TF_ID frame_id)
     for (i = 0; i < tf->internal.count_id_lst; i++) {
         lst = &tf->internal.id_listeners[i];
         // test if live & matching
-        if (lst->fn != NULL && lst->id == frame_id) {
+        if (lst->fn != nullptr && lst->id == frame_id) {
             cleanup_id_listener(tf, i, lst);
             return true;
         }
@@ -398,7 +397,7 @@ bool _TF_FN TF_RemoveTypeListener(TinyFrame *tf, TF_TYPE type)
     for (i = 0; i < tf->internal.count_type_lst; i++) {
         lst = &tf->internal.type_listeners[i];
         // test if live & matching
-        if (lst->fn != NULL    && lst->type == type) {
+        if (lst->fn != nullptr    && lst->type == type) {
             cleanup_type_listener(tf, i, lst);
             return true;
         }
@@ -457,8 +456,8 @@ static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf)
             msg.userdata = ilst->userdata; // pass userdata pointer to the callback
             msg.userdata2 = ilst->userdata2;
             res = ilst->fn(tf, &msg);
-            ilst->userdata = msg.userdata; // put it back (may have changed the pointer or set to NULL)
-            ilst->userdata2 = msg.userdata2; // put it back (may have changed the pointer or set to NULL)
+            ilst->userdata = msg.userdata; // put it back (may have changed the pointer or set to nullptr)
+            ilst->userdata2 = msg.userdata2; // put it back (may have changed the pointer or set to nullptr)
 
             if (res != TF_NEXT) {
                 // if it's TF_CLOSE, we assume user already cleaned up userdata
@@ -466,9 +465,9 @@ static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf)
                     renew_id_listener(ilst);
                 }
                 else if (res == TF_CLOSE) {
-                    // Set userdata to NULL to avoid calling user for cleanup
-                    ilst->userdata = NULL;
-                    ilst->userdata2 = NULL;
+                    // Set userdata to nullptr to avoid calling user for cleanup
+                    ilst->userdata = nullptr;
+                    ilst->userdata2 = nullptr;
                     cleanup_id_listener(tf, i, ilst);
                 }
                 return;
@@ -477,8 +476,8 @@ static void _TF_FN TF_HandleReceivedMessage(TinyFrame *tf)
     }
     // clean up for the following listeners that don't use userdata (this avoids data from
     // an ID listener that returned TF_NEXT from leaking into Type and Generic listeners)
-    msg.userdata = NULL;
-    msg.userdata2 = NULL;
+    msg.userdata = nullptr;
+    msg.userdata2 = nullptr;
 
     // Type listeners
     for (i = 0; i < tf->internal.count_type_lst; i++) {
@@ -533,7 +532,7 @@ bool _TF_FN TF_RenewIdListener(TinyFrame *tf, TF_ID id)
     for (i = 0; i < tf->internal.count_id_lst; i++) {
         lst = &tf->internal.id_listeners[i];
         // test if live & matching
-        if (lst->fn != NULL && lst->id == id) {
+        if (lst->fn != nullptr && lst->id == id) {
             renew_id_listener(lst);
             return true;
         }
@@ -867,7 +866,7 @@ static inline uint32_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum)
  *
  * @param tf - instance
  * @param msg - message to send
- * @param listener - response listener or NULL
+ * @param listener - response listener or nullptr
  * @param ftimeout - time out callback
  * @param timeout - listener timeout ticks, 0 = indefinite
  * @return success (mutex claimed and listener added, if any)
@@ -948,7 +947,7 @@ static void _TF_FN TF_SendFrame_End(TinyFrame *tf)
  *
  * @param tf - instance
  * @param msg - message object
- * @param listener - ID listener, or NULL
+ * @param listener - ID listener, or nullptr
  * @param ftimeout - time out callback
  * @param timeout - listener timeout, 0 is none
  * @return true if sent
@@ -956,9 +955,9 @@ static void _TF_FN TF_SendFrame_End(TinyFrame *tf)
 static bool _TF_FN TF_SendFrame(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
     TF_TRY(TF_SendFrame_Begin(tf, msg, listener, ftimeout, timeout));
-    if (msg->len == 0 || msg->data != NULL) {
+    if (msg->len == 0 || msg->data != nullptr) {
         // Send the payload and checksum only if we're not starting a multi-part frame.
-        // A multi-part frame is identified by passing NULL to the data field and setting the length.
+        // A multi-part frame is identified by passing nullptr to the data field and setting the length.
         // User then needs to call those functions manually
         TF_SendFrame_Chunk(tf, msg->data, msg->len);
         TF_SendFrame_End(tf);
@@ -974,7 +973,7 @@ static bool _TF_FN TF_SendFrame(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame
 /** send without listener */
 bool _TF_FN TF_Send(TinyFrame *tf, TinyFrame::TF_Msg *msg)
 {
-    return TF_SendFrame(tf, msg, NULL, NULL, 0);
+    return TF_SendFrame(tf, msg, nullptr, nullptr, 0);
 }
 
 /** send without listener and struct */
@@ -1019,29 +1018,29 @@ bool _TF_FN TF_Respond(TinyFrame *tf, TinyFrame::TF_Msg *msg)
 
 bool _TF_FN TF_Send_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg)
 {
-    msg->data = NULL;
+    msg->data = nullptr;
     return TF_Send(tf, msg);
 }
 
 bool _TF_FN TF_SendSimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len)
 {
-    return TF_SendSimple(tf, type, NULL, len);
+    return TF_SendSimple(tf, type, nullptr, len);
 }
 
 bool _TF_FN TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
-    return TF_QuerySimple(tf, type, NULL, len, listener, ftimeout, timeout);
+    return TF_QuerySimple(tf, type, nullptr, len, listener, ftimeout, timeout);
 }
 
 bool _TF_FN TF_Query_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout)
 {
-    msg->data = NULL;
+    msg->data = nullptr;
     return TF_Query(tf, msg, listener, ftimeout, timeout);
 }
 
 void _TF_FN TF_Respond_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg)
 {
-    msg->data = NULL;
+    msg->data = nullptr;
     TF_Respond(tf, msg);
 }
 
@@ -1076,7 +1075,7 @@ void _TF_FN TF_Tick(TinyFrame *tf)
         // count down...
         if (--lst->timeout == 0) {
             TF_Error("ID listener %d has expired", (int)lst->id);
-            if (lst->fn_timeout != NULL) {
+            if (lst->fn_timeout != nullptr) {
                 lst->fn_timeout(tf); // execute timeout function
             }
             // Listener has expired

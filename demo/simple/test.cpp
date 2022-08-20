@@ -1,5 +1,5 @@
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include "../../TinyFrame.hpp"
 #include "../utils.hpp"
 
@@ -71,7 +71,7 @@ int main(void)
 
     msg.len = 0;
     msg.type = 0x77;
-    TF_Query(demo_tf, &msg, testIdListener, NULL, 0);
+    TF_Query(demo_tf, &msg, testIdListener, nullptr, 0);
     
     printf("This should fail:\n");
     

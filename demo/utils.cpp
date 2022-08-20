@@ -3,7 +3,7 @@
 //
 
 #include "utils.hpp"
-#include <stdio.h>
+#include <cstdio>
 
 // helper func for testing
 void dumpFrame(const uint8_t *buff, size_t len)

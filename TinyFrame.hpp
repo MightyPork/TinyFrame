@@ -13,7 +13,7 @@
 #define TF_VERSION "2.3.0"
 
 //---------------------------------------------------------------------------
-#include <string.h>  // for memset()
+#include <cstring>  // for memset()
 //---------------------------------------------------------------------------
 
 // Checksum type (0 = none, 8 = ~XOR, 16 = CRC16 0x8005, 32 = CRC32)
@@ -101,10 +101,10 @@ class TinyFrame{
             /**
              * Buffer of received data, or data to send.
              *
-             * - If (data == NULL) in an ID listener, that means the listener timed out and
+             * - If (data == nullptr) in an ID listener, that means the listener timed out and
              *   the user should free any userdata and take other appropriate actions.
              *
-             * - If (data == NULL) and length is not zero when sending a frame, that starts a multi-part frame.
+             * - If (data == nullptr) and length is not zero when sending a frame, that starts a multi-part frame.
              *   This call then must be followed by sending the payload and closing the frame.
              */
             const uint8_t *data;
@@ -241,7 +241,7 @@ static inline void TF_ClearMsg(TinyFrame::TF_Msg *msg)
  *
  * @param tf - instance
  * @param peer_bit - peer bit to use for self
- * @return TF instance or NULL
+ * @return TF instance or nullptr
  */
 TinyFrame *TF_Init(TF_Peer peer_bit);
 
@@ -393,7 +393,7 @@ bool TF_SendSimple(TinyFrame *tf, TF_TYPE type, const uint8_t *data, TF_LEN len)
  *
  * @param tf - instance
  * @param msg - message struct. ID is stored in the frame_id field
- * @param listener - listener waiting for the response (can be NULL)
+ * @param listener - listener waiting for the response (can be nullptr)
  * @param ftimeout - time out callback
  * @param timeout - listener expiry time in ticks
  * @return success
@@ -424,7 +424,7 @@ bool TF_Respond(TinyFrame *tf, TinyFrame::TF_Msg *msg);
 
 /**
  * TF_Send() with multipart payload.
- * msg.data is ignored and set to NULL
+ * msg.data is ignored and set to nullptr
  */
 bool TF_Send_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg);
 
@@ -440,13 +440,13 @@ bool TF_QuerySimple_Multipart(TinyFrame *tf, TF_TYPE type, TF_LEN len, TinyFrame
 
 /**
  * TF_Query() with multipart payload.
- * msg.data is ignored and set to NULL
+ * msg.data is ignored and set to nullptr
  */
 bool TF_Query_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg, TinyFrame::TF_Listener listener, TinyFrame::TF_Listener_Timeout ftimeout, TF_TICKS timeout);
 
 /**
  * TF_Respond() with multipart payload.
- * msg.data is ignored and set to NULL
+ * msg.data is ignored and set to nullptr
  */
 void TF_Respond_Multipart(TinyFrame *tf, TinyFrame::TF_Msg *msg);
 

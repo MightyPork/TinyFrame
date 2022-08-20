@@ -5,7 +5,7 @@
 #ifndef TF_UTILS_H
 #define TF_UTILS_H
 
-#include <stdio.h>
+#include <cstdio>
 #include "../TinyFrame.hpp"
 
 /** pointer to unsigned char */

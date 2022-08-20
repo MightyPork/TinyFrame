@@ -7,8 +7,8 @@
 #ifndef TF_CONFIG_H
 #define TF_CONFIG_H
 
-#include <stdint.h>
-#include <stdio.h> // used by the TF_Error() macro defined below
+#include <cstdint>
+#include <cstdio> // used by the TF_Error() macro defined below
 //#include <esp8266.h> // when using with esphttpd
 
 //----------------------------- FRAME FORMAT ---------------------------------

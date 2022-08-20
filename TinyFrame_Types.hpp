@@ -1,9 +1,8 @@
 #ifndef TinyFrame_TypesHPP
 #define TinyFrame_TypesHPP
 
-#include <stdint.h>  // for uint8_t etc
-#include <stdbool.h> // for bool
-#include <stddef.h>  // for NULL
+#include <cstdint>  // for uint8_t etc
+//#include <cstddef>  // for nullptr
 
 typedef uint16_t TF_TICKS;
 typedef uint8_t TF_COUNT;
