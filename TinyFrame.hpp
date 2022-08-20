@@ -38,6 +38,45 @@ class TinyFrame{
         };
         ~TinyFrame() = default;
 
+        /* --- Callback types --- */
+        // This is publicly visible only to allow static init.
+        /**
+         * TinyFrame Type Listener callback
+         *
+         * @param tf - instance
+         * @param msg - the received message, userdata is populated inside the object
+         * @return listener result
+         */
+        typedef TF_Result (*TF_Listener)(TinyFrame<TF_CKSUM_TYPE> *tf, TF_Msg *msg);
+
+        /**
+         * TinyFrame Type Listener callback
+         *
+         * @param tf - instance
+         * @param msg - the received message, userdata is populated inside the object
+         * @return listener result
+         */
+        typedef TF_Result (*TF_Listener_Timeout)(TinyFrame<TF_CKSUM_TYPE> *tf);
+
+        struct TF_IdListener_ {
+            TF_ID id;
+            TF_Listener fn;
+            TF_Listener_Timeout fn_timeout;
+            TF_TICKS timeout;     // nr of ticks remaining to disable this listener
+            TF_TICKS timeout_max; // the original timeout is stored here (0 = no timeout)
+            void *userdata;
+            void *userdata2;
+        };
+
+        struct TF_TypeListener_ {
+            TF_TYPE type;
+            TF_Listener fn;
+        };
+
+        struct TF_GenericListener_ {
+            TF_Listener fn;
+        };
+
         struct{
             /* Public user data */
             void *userdata;
@@ -309,8 +348,8 @@ class TinyFrame{
         uint32_t _TF_FN TF_ComposeHead(TinyFrame *tf, uint8_t *outbuff, TF_Msg *msg);
         uint32_t _TF_FN TF_ComposeBody(uint8_t *outbuff,
                                             const uint8_t *data, TF_LEN data_len,
-                                            TF_CKSUM *cksum);
-        uint32_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM *cksum);
+                                            TF_CKSUM<TF_CKSUM_TYPE> *cksum);
+        uint32_t _TF_FN TF_ComposeTail(uint8_t *outbuff, TF_CKSUM<TF_CKSUM_TYPE> *cksum);
         bool _TF_FN TF_SendFrame_Begin(TinyFrame *tf, TF_Msg *msg, TF_Listener listener, TF_Listener_Timeout ftimeout, TF_TICKS timeout);
         void _TF_FN TF_SendFrame_Chunk(TinyFrame *tf, const uint8_t *buff, uint32_t length);
         void _TF_FN TF_SendFrame_End(TinyFrame *tf);
@@ -346,7 +385,8 @@ class TinyFrame{
  * @param peer_bit - peer bit to use for self
  * @return TF instance or nullptr
  */
-TinyFrame *TF_Init(TF_Peer peer_bit);
+template <TF_CKSUM_t TF_CKSUM_TYPE>
+TinyFrame<TF_CKSUM_TYPE> *TF_Init(TF_Peer peer_bit);
 
 
 /**
@@ -358,14 +398,16 @@ TinyFrame *TF_Init(TF_Peer peer_bit);
  * @param peer_bit - peer bit to use for self
  * @return success
  */
-bool TF_InitStatic(TinyFrame *tf, TF_Peer peer_bit);
+template <TF_CKSUM_t TF_CKSUM_TYPE>
+bool TF_InitStatic(TinyFrame<TF_CKSUM_TYPE> *tf, TF_Peer peer_bit);
 
 /**
  * De-init the dynamically allocated TF instance
  *
  * @param tf - instance
  */
-void TF_DeInit(TinyFrame *tf);
+template <TF_CKSUM_t TF_CKSUM_TYPE>
+void TF_DeInit(TinyFrame<TF_CKSUM_TYPE> *tf);
 
 
 
@@ -380,16 +422,19 @@ void TF_DeInit(TinyFrame *tf);
  *
  * ! Implement this in your application code !
  */
-extern void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len);
+template <TF_CKSUM_t TF_CKSUM_TYPE>
+extern void TF_WriteImpl(TinyFrame<TF_CKSUM_TYPE> *tf, const uint8_t *buff, uint32_t len);
 
 // Mutex functions
 #if TF_USE_MUTEX
 
-    /** Claim the TX interface before composing and sending a frame */
-    extern bool TF_ClaimTx(TinyFrame *tf);
+/** Claim the TX interface before composing and sending a frame */
+template <TF_CKSUM_t TF_CKSUM_TYPE>
+extern bool TF_ClaimTx(TinyFrame<TF_CKSUM_TYPE> *tf);
 
-    /** Free the TX interface after composing and sending a frame */
-    extern void TF_ReleaseTx(TinyFrame *tf);
+/** Free the TX interface after composing and sending a frame */
+template <TF_CKSUM_t TF_CKSUM_TYPE>
+extern void TF_ReleaseTx(TinyFrame<TF_CKSUM_TYPE> *tf);
 
 #endif
 

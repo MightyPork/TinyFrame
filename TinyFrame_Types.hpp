@@ -144,46 +144,6 @@ struct TF_Msg{
 
 };
 
-
-/* --- Callbacks --- */
-// This is publicly visible only to allow static init.
-/**
- * TinyFrame Type Listener callback
- *
- * @param tf - instance
- * @param msg - the received message, userdata is populated inside the object
- * @return listener result
- */
-typedef TF_Result (*TF_Listener)(TinyFrame<> *tf, TF_Msg *msg);
-
-/**
- * TinyFrame Type Listener callback
- *
- * @param tf - instance
- * @param msg - the received message, userdata is populated inside the object
- * @return listener result
- */
-typedef TF_Result (*TF_Listener_Timeout)(TinyFrame *tf);
-
-struct TF_IdListener_ {
-    TF_ID id;
-    TF_Listener fn;
-    TF_Listener_Timeout fn_timeout;
-    TF_TICKS timeout;     // nr of ticks remaining to disable this listener
-    TF_TICKS timeout_max; // the original timeout is stored here (0 = no timeout)
-    void *userdata;
-    void *userdata2;
-};
-
-struct TF_TypeListener_ {
-    TF_TYPE type;
-    TF_Listener fn;
-};
-
-struct TF_GenericListener_ {
-    TF_Listener fn;
-};
-
 } // TinyFrame_n
 
 #endif // TinyFrame_TypesHPP
