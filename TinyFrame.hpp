@@ -1025,8 +1025,8 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
  * @param num - number to write
  * @param xtra - extra callback run after each byte, 'b' now contains the byte.
  */
-#define WRITENUM_BASE(type, num, xtra) \
-    for (si = sizeof(type)-1; si>=0; si--) { \
+#define WRITENUM_BASE(typesize, num, xtra) \
+    for (si = (typesize-1); si>=0; si--) { \
         b = (uint8_t)((num) >> (si*8) & 0xFF); \
         outbuff[pos++] = b; \
         xtra; \
@@ -1043,7 +1043,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
  * @param type - data type
  * @param num - number to write
  */
-#define WRITENUM(type, num)       WRITENUM_BASE(type, num, _NOOP())
+#define WRITENUM(typesize, num)       WRITENUM_BASE(typesize, num, _NOOP())
 
 /**
  * Write a number AND add its bytes to the checksum
@@ -1051,7 +1051,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
  * @param type - data type
  * @param num - number to write
  */
-#define WRITENUM_CKSUM(cksumtype, type, num) WRITENUM_BASE(type, num, TF_CksumAdd<cksumtype>(cksum, b))
+#define WRITENUM_CKSUM(cksumtype, typesize, num) WRITENUM_BASE(typesize, num, TF_CksumAdd<cksumtype>(cksum, b))
 
 /**
  * Compose a frame (used internally by TF_Send and TF_Respond).
@@ -1095,13 +1095,13 @@ uint32_t _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_ComposeHead(uint8_t *outbuff, T
     cksum = TF_CksumAdd<TF_CKSUM_TYPE>(cksum, TF_SOF_BYTE); // CKSUM_ADD
 #endif
 
-    WRITENUM_CKSUM(TF_CKSUM_TYPE, TF_ID, id);
-    WRITENUM_CKSUM(TF_CKSUM_TYPE, TF_LEN, msg->len);
-    WRITENUM_CKSUM(TF_CKSUM_TYPE, TF_TYPE, msg->type);
+    WRITENUM_CKSUM(TF_CKSUM_TYPE, this->tfConfig.TF_ID_BYTES, id);
+    WRITENUM_CKSUM(TF_CKSUM_TYPE, this->tfConfig.TF_LEN_BYTES, msg->len);
+    WRITENUM_CKSUM(TF_CKSUM_TYPE, this->tfConfig.TF_TYPE_BYTES, msg->type);
 
 #if TF_CKSUM_TYPE != TF_CKSUM_NONE
     CKSUM_FINALIZE(cksum);
-    WRITENUM(TF_CKSUM, cksum);
+    WRITENUM(sizeof(TF_CKSUM<TF_CKSUM_TYPE>), cksum);
 #endif
 
     return pos;
@@ -1151,7 +1151,7 @@ uint32_t _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_ComposeTail(uint8_t *outbuff, T
 
 #if TF_CKSUM_TYPE != TF_CKSUM_NONE
     CKSUM_FINALIZE(*cksum);
-    WRITENUM(TF_CKSUM, *cksum);
+    WRITENUM(sizeof(TF_CKSUM<TF_CKSUM_TYPE>), *cksum);
 #endif
     return pos;
 }
