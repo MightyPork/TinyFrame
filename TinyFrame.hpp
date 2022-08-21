@@ -1051,7 +1051,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
  * @param type - data type
  * @param num - number to write
  */
-#define WRITENUM_CKSUM(cksumtype, typesize, num) WRITENUM_BASE(typesize, num, TF_CksumAdd<cksumtype>(cksum, b))
+#define WRITENUM_CKSUM(cksumtype, typesize, num) WRITENUM_BASE(typesize, num, CKSUM_ADD(cksum, b))
 
 /**
  * Compose a frame (used internally by TF_Send and TF_Respond).
