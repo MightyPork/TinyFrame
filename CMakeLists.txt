@@ -12,7 +12,7 @@ set(SOURCE_FILES
         TinyFrame_CRC.hpp
         TinyFrame_Types.hpp
         TF_Config.hpp
-        TF_Integration.example.cpp
+        tests/TF_SimpleTest.cpp
 
         # demo/simple/test.cpp
         # demo/utils.cpp
