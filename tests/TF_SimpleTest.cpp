@@ -86,21 +86,37 @@ TF_CKSUM<TF_CKSUM_t::CUSTOM8> TF_CksumEnd<TF_CKSUM_t::CUSTOM8>(TF_CKSUM<TF_CKSUM
 
 // --------- Example Type Listener ---------
 TF_Result genericListener(TF_Msg *msg){
-    printf("Received Listener 123 Message: %s", msg->data);    
+    printf("Received Message - Generic Listener : %s\n", msg->data);    
     return TF_STAY;
 }
 
 TF_Result typeListener123(TF_Msg *msg){
-    printf("Received Listener 123 Message: %s", msg->data);    
+    printf("Received Message - Type Listener 123: %s\n", msg->data);    
+    return TF_STAY;
+}
+
+TF_Result typeTimeoutListener123(){
+    printf("Timeout - Type Listener 123\n");    
     return TF_STAY;
 }
 
 TF_Result idListener234(TF_Msg *msg){
-    printf("Received ID Listener 234 Message: %s", msg->data);    
+    printf("Received Message - ID Listener 234: %s\n", msg->data);    
     return TF_CLOSE;
 }
+
 TF_Result idTimeoutListener234(){
-    printf("Received ID Listener 234 Message");
+    printf("Timeout - ID Listener 234\n");
+    return TF_STAY;
+}
+
+TF_Result queryListener(TF_Msg *msg){
+    printf("Received Message - Query Listener: %s\n", msg->data);    
+    return TF_CLOSE;
+}
+
+TF_Result queryTimeoutListener(){
+    printf("Timeout - Query Listener\n");
     return TF_STAY;
 }
 
@@ -161,7 +177,24 @@ int main(){
         tf_2.TF_Tick();
     }
 
-
     bool successSend = tf_1.TF_Send(&msg);
+    assert(successSend);
+    bool successSendSimple = tf_1.TF_SendSimple(123, messageData, sizeof(messageData));
+    assert(successSendSimple);
+
+    bool successSendQuery = tf_1.TF_Query(&msg, &TinyFrame_n::idListener234, nullptr, 0);
+    assert(successSendQuery);
+    bool successSendRespond = tf_1.TF_Respond(&msg);
+    assert(successSendRespond);
+    bool successSendQueryMulti = tf_1.TF_Query_Multipart(&msg, &TinyFrame_n::queryListener, &TinyFrame_n::queryTimeoutListener, 10);
+    assert(successSendQueryMulti);
+    tf_1.TF_Respond_Multipart(&msg);
+    
+    bool successSendQuerySimple = tf_1.TF_QuerySimple(123, messageData, sizeof(messageData), &TinyFrame_n::typeListener123, &TinyFrame_n::typeTimeoutListener123, 10);
+    assert(successSendQuerySimple);
+
+    tf_1.TF_Multipart_Payload(messageData, sizeof(messageData));
+    tf_1.TF_Multipart_Close();
+
     assert(successSend);
 }

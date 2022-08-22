@@ -79,8 +79,6 @@ class TinyFrame{
          */
         typedef TF_Result (*TF_Listener_Timeout)();
 
-        TF_Result (*TF_Callback_Timeout)();
-
         // ------------------------ TO BE IMPLEMENTED BY USER ------------------------
 
         const struct TF_RequiredCallbacks{
