@@ -14,6 +14,7 @@
 
 //---------------------------------------------------------------------------
 #include <new> // placement new
+#include <string>
 //---------------------------------------------------------------------------
 
 #include "TinyFrame_Types.hpp"
@@ -89,6 +90,8 @@ class TinyFrame{
              * ! Implement this in your application code !
              */
             void (*TF_WriteImpl)(const uint8_t *buff, uint32_t len);
+
+            void (*TF_Error)(std::string message);
 
             // Mutex functions
             #if TF_USE_MUTEX
@@ -464,7 +467,7 @@ void TF_DeInit(TinyFrame<TF_TEMPLATE_PARMS> *tf);
     /** Claim the TX interface before composing and sending a frame */
     bool TinyFrame<TF_TEMPLATE_PARMS>::TF_ClaimTx() {
         if (tf->internal.soft_lock) {
-            TF_Error("TF already locked for tx!");
+            this->tfCallbacks.TF_Error("TF already locked for tx!");
             return false;
         }
 
@@ -487,7 +490,7 @@ template<TF_TEMPLATE_ARGS>
 bool _TF_FN TF_InitStatic(TinyFrame<TF_TEMPLATE_PARMS> *tf, TF_Peer peer_bit)
 {
     if (tf == nullptr) {
-        TF_Error("TF_InitStatic() failed, tf is null.");
+        // TF_InitStatic() failed, tf is null.
         return false;
     }
 
@@ -510,7 +513,7 @@ TinyFrame<TF_TEMPLATE_PARMS> * _TF_FN TF_Init(TF_Peer peer_bit)
 {
     TinyFrame<TF_TEMPLATE_PARMS> *tf = new TinyFrame<TF_TEMPLATE_PARMS>();
     if (!tf) {
-        TF_Error("TF_Init() failed, out of memory.");
+        // TF_Init() failed, out of memory.
         return nullptr;
     }
 
@@ -604,7 +607,7 @@ bool _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AddIdListener(TF_Msg *msg, TF_Liste
         }
     }
 
-    TF_Error("Failed to add ID listener");
+    this->tfCallbacks.TF_Error("Failed to add ID listener");
     return false;
 }
 
@@ -627,7 +630,7 @@ bool _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AddTypeListener(TF_TYPE frame_type,
         }
     }
 
-    TF_Error("Failed to add type listener");
+    this->tfCallbacks.TF_Error("Failed to add type listener");
     return false;
 }
 
@@ -649,7 +652,7 @@ bool _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AddGenericListener(TF_Listener cb)
         }
     }
 
-    TF_Error("Failed to add generic listener");
+    this->tfCallbacks.TF_Error("Failed to add generic listener");
     return false;
 }
 
@@ -668,7 +671,7 @@ bool _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_RemoveIdListener(TF_ID frame_id)
         }
     }
 
-    TF_Error("ID listener %d to remove not found", (int)frame_id);
+    this->tfCallbacks.TF_Error("ID listener %d to remove not found", (int)frame_id);
     return false;
 }
 
@@ -687,7 +690,7 @@ bool _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_RemoveTypeListener(TF_TYPE type)
         }
     }
 
-    TF_Error("Type listener %d to remove not found", (int)type);
+    this->tfCallbacks.TF_Error("Type listener %d to remove not found", (int)type);
     return false;
 }
 
@@ -706,7 +709,7 @@ bool _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_RemoveGenericListener(TF_Listener c
         }
     }
 
-    TF_Error("Generic listener to remove not found");
+    this->tfCallbacks.TF_Error("Generic listener to remove not found");
     return false;
 }
 
@@ -807,7 +810,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_HandleReceivedMessage()
         }
     }
 
-    TF_Error("Unhandled message, type %d", (int)msg.type);
+    this->tfCallbacks.TF_Error("Unhandled message, type");
 }
 
 /** Externally renew an ID listener */
@@ -825,7 +828,7 @@ bool _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_RenewIdListener(TF_ID id)
         }
     }
 
-    TF_Error("Renew listener: not found (id %d)", (int)id);
+    this->tfCallbacks.TF_Error("Renew listener: not found (id %d)", (int)id);
     return false;
 }
 
@@ -876,7 +879,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
     if (this->internal.parser_timeout_ticks >= this->tfConfig.TF_PARSER_TIMEOUT_TICKS) {
         if (this->internal.state != TFState_SOF) {
             this->TF_ResetParser();
-            TF_Error("Parser timeout");
+            this->tfCallbacks.TF_Error("Parser timeout");
         }
     }
     this->internal.parser_timeout_ticks = 0;
@@ -941,7 +944,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
                 CKSUM_FINALIZE(this->internal.cksum);
 
                 if (this->internal.cksum != this->internal.ref_cksum) {
-                    TF_Error("Rx head cksum mismatch");
+                    this->tfCallbacks.TF_Error("Rx head cksum mismatch");
                     this->TF_ResetParser();
                     break;
                 }
@@ -961,7 +964,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
 
                 //Start collecting the payload
                 if (this->internal.len > TF_MAX_PAYLOAD_RX) {
-                    TF_Error("Rx payload too long: %d", (int)this->internal.len);
+                    this->tfCallbacks.TF_Error("Rx payload too long");
                     // ERROR - frame too long. Consume, but do not store.
                     this->internal.discard_data = true;
                 }
@@ -998,7 +1001,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
                     if (this->internal.cksum == this->internal.ref_cksum) {
                         this->TF_HandleReceivedMessage();
                     } else {
-                        TF_Error("Body cksum mismatch");
+                        this->tfCallbacks.TF_Error("Body cksum mismatch");
                     }
                 }
 
@@ -1355,7 +1358,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_Multipart_Payload(const uint8_t *bu
 template<TF_TEMPLATE_ARGS>
 void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_Multipart_Close()
 {
-    TF_SendFrame_End(this);
+    this->TF_SendFrame_End();
 }
 
 //endregion Sending API funcs - multipart
@@ -1379,9 +1382,9 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_Tick()
         if (!lst->fn || lst->timeout == 0) continue;
         // count down...
         if (--lst->timeout == 0) {
-            TF_Error("ID listener %d has expired", (int)lst->id);
+            this->tfCallbacks.TF_Error("ID listener has expired");
             if (lst->fn_timeout != nullptr) {
-                lst->fn_timeout(this); // execute timeout function
+                lst->fn_timeout(); // execute timeout function
             }
             // Listener has expired
             this->cleanup_id_listener(i, lst);

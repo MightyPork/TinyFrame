@@ -2,20 +2,10 @@
 #include "../TinyFrame_CRC.hpp"
 
 #include <iostream>
+#include <string>
+#include <cassert>
 
-/**
- * This is an example of integrating TinyFrame into the application.
- * 
- * TF_WriteImpl() is required, the mutex functions are weak and can
- * be removed if not used. They are called from all TF_Send/Respond functions.
- * 
- * Also remember to periodically call TF_Tick() if you wish to use the 
- * listener timeout feature.
- */
-
-using TinyFrame_CRC8 =  TinyFrame_n::TinyFrame<TinyFrame_n::TF_CKSUM_t::CRC8>;
 using TinyFrame_CRC16 = TinyFrame_n::TinyFrame<TinyFrame_n::TF_CKSUM_t::CRC16>;
-using TinyFrame_CRC32 = TinyFrame_n::TinyFrame<TinyFrame_n::TF_CKSUM_t::CRC32>;
 
 extern TinyFrame_CRC16 tf_1;
 extern TinyFrame_CRC16 tf_2;
@@ -31,6 +21,7 @@ void TF_WriteImpl_1(const uint8_t *buff, uint32_t len)
     }
     printf("\n");
 }
+
 void TF_WriteImpl_2(const uint8_t *buff, uint32_t len)
 {
     tf_1.TF_Accept(buff, len);
@@ -40,6 +31,14 @@ void TF_WriteImpl_2(const uint8_t *buff, uint32_t len)
         printf("%02x", buff[i]);
     }
     printf("\n");
+}
+
+void TF_Error_1(std::string message){
+    
+}
+
+void TF_Error_2(std::string message){
+
 }
 
 // --------- Mutex callbacks ----------
@@ -84,8 +83,24 @@ TF_CKSUM<TF_CKSUM_t::CUSTOM8> TF_CksumEnd<TF_CKSUM_t::CUSTOM8>(TF_CKSUM<TF_CKSUM
     return cksum;
 }
 
+
+// --------- Example Type Listener ---------
+TF_Result genericListener(TF_Msg *msg){
+    printf("Received Listener 123 Message: %s", msg->data);    
+    return TF_STAY;
+}
+
 TF_Result typeListener123(TF_Msg *msg){
     printf("Received Listener 123 Message: %s", msg->data);    
+    return TF_STAY;
+}
+
+TF_Result idListener234(TF_Msg *msg){
+    printf("Received ID Listener 234 Message: %s", msg->data);    
+    return TF_CLOSE;
+}
+TF_Result idTimeoutListener234(){
+    printf("Received ID Listener 234 Message");
     return TF_STAY;
 }
 
@@ -95,27 +110,17 @@ TF_Result typeListener123(TF_Msg *msg){
 
 const TinyFrame_CRC16::TF_RequiredCallbacks callbacks_1 = {
     .TF_WriteImpl = TinyFrame_n::TF_WriteImpl_1,
+    .TF_Error = TinyFrame_n::TF_Error_1,
     .TF_ClaimTx =   TinyFrame_n::TF_ClaimTx, 
-    .TF_ReleaseTx = TinyFrame_n::TF_ReleaseTx
+    .TF_ReleaseTx = TinyFrame_n::TF_ReleaseTx,
 };
 
 const TinyFrame_CRC16::TF_RequiredCallbacks callbacks_2 = {
     .TF_WriteImpl = TinyFrame_n::TF_WriteImpl_2,
+    .TF_Error = TinyFrame_n::TF_Error_2,
     .TF_ClaimTx =   TinyFrame_n::TF_ClaimTx, 
-    .TF_ReleaseTx = TinyFrame_n::TF_ReleaseTx
+    .TF_ReleaseTx = TinyFrame_n::TF_ReleaseTx,
 };
-
-// const TinyFrame_CRC16::TF_RequiredCallbacks callbacks16 = {
-//     .TF_WriteImpl = TinyFrame_n::TF_WriteImpl,
-//     .TF_ClaimTx =   TinyFrame_n::TF_ClaimTx, 
-//     .TF_ReleaseTx = TinyFrame_n::TF_ReleaseTx
-// };
-
-// const TinyFrame_CRC32::TF_RequiredCallbacks callbacks32 = {
-//     .TF_WriteImpl = TinyFrame_n::TF_WriteImpl,
-//     .TF_ClaimTx =   TinyFrame_n::TF_ClaimTx, 
-//     .TF_ReleaseTx = TinyFrame_n::TF_ReleaseTx
-// };
 
 TinyFrame_n::TinyFrameConfig_t config = {
     .TF_ID_BYTES             = 1U,
@@ -138,14 +143,25 @@ int main(){
     uint8_t messageData[] = "Hello TinyFrame!";
 
     TinyFrame_n::TF_Msg msg = {
-        .frame_id    = 0,
+        .frame_id    = 234,
         .is_response = false,
         .type        = 123,
         .data        = messageData,
         .len         = sizeof(messageData)
     };
 
-    tf_2.TF_AddTypeListener(123, &TinyFrame_n::typeListener123);
+    bool successGenericListener = tf_2.TF_AddGenericListener(&TinyFrame_n::genericListener);
+    assert(successGenericListener);
+    bool successTypeListener = tf_2.TF_AddTypeListener(123, &TinyFrame_n::typeListener123);
+    assert(successTypeListener);
+    bool successIDListener = tf_2.TF_AddIdListener(&msg, &TinyFrame_n::idListener234, &TinyFrame_n::idTimeoutListener234, 10);
+    assert(successIDListener);
 
-    tf_1.TF_Send(&msg);
+    for (size_t i = 0; i < 5; i++){
+        tf_2.TF_Tick();
+    }
+
+
+    bool successSend = tf_1.TF_Send(&msg);
+    assert(successSend);
 }

@@ -62,9 +62,6 @@ typedef size_t TF_COUNT;
 // Whether to use mutex - requires you to implement TF_ClaimTx() and TF_ReleaseTx()
 #define TF_USE_MUTEX  1
 
-// Error reporting function. To disable debug, change to empty define
-#define TF_Error(format, ...) 
-
 //------------------------- End of user config ------------------------------
 } // TinyFrame_n
 #endif //TF_CONFIG_H
