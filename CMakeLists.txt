@@ -11,7 +11,6 @@ set(SOURCE_FILES
         TinyFrame_CRC.cpp
         TinyFrame_CRC.hpp
         TinyFrame_Types.hpp
-        TF_Config.hpp
         tests/TF_SimpleTest.cpp
 
         # demo/simple/test.cpp
@@ -24,7 +23,5 @@ set(SOURCE_FILES
         # demo/demo.c
         # demo/demo.h
         )
-
-include_directories(demo/simple)
 
 add_executable(tf ${SOURCE_FILES})

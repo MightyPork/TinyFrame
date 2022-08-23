@@ -2,7 +2,6 @@
 #define TinyFrame_CRC_HPP
 
 #include "TinyFrame_Types.hpp"
-#include "TF_Config.hpp"
 
 namespace TinyFrame_n{
 //region Checksums
