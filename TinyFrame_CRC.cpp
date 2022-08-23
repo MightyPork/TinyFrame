@@ -3,29 +3,29 @@
 namespace TinyFrame_n{
 
 template<>
-TF_CKSUM<TF_CKSUM_t::NONE> TF_CksumStart<TF_CKSUM_t::NONE>(void)
+CKSUM<CKSUM_t::NONE> CksumStart<CKSUM_t::NONE>(void)
   { return 0; }
 
 template<>
-TF_CKSUM<TF_CKSUM_t::NONE> TF_CksumAdd<TF_CKSUM_t::NONE>(TF_CKSUM<TF_CKSUM_t::NONE> cksum, uint8_t byte)
+CKSUM<CKSUM_t::NONE> CksumAdd<CKSUM_t::NONE>(CKSUM<CKSUM_t::NONE> cksum, uint8_t byte)
   { return cksum; }
 
 template<>
-TF_CKSUM<TF_CKSUM_t::NONE> TF_CksumEnd<TF_CKSUM_t::NONE>(TF_CKSUM<TF_CKSUM_t::NONE> cksum)
+CKSUM<CKSUM_t::NONE> CksumEnd<CKSUM_t::NONE>(CKSUM<CKSUM_t::NONE> cksum)
   { return cksum; }
 
 
 template<>
-TF_CKSUM<TF_CKSUM_t::XOR> TF_CksumStart<TF_CKSUM_t::XOR>(void)
+CKSUM<CKSUM_t::XOR> CksumStart<CKSUM_t::XOR>(void)
   { return 0; }
 
 template<>
-TF_CKSUM<TF_CKSUM_t::XOR> TF_CksumAdd<TF_CKSUM_t::XOR>(TF_CKSUM<TF_CKSUM_t::XOR> cksum, uint8_t byte)
+CKSUM<CKSUM_t::XOR> CksumAdd<CKSUM_t::XOR>(CKSUM<CKSUM_t::XOR> cksum, uint8_t byte)
   { return cksum ^ byte; }
 
 template<>
-TF_CKSUM<TF_CKSUM_t::XOR> TF_CksumEnd<TF_CKSUM_t::XOR>(TF_CKSUM<TF_CKSUM_t::XOR> cksum)
-  { return (TF_CKSUM<TF_CKSUM_t::XOR>) ~cksum; }
+CKSUM<CKSUM_t::XOR> CksumEnd<CKSUM_t::XOR>(CKSUM<CKSUM_t::XOR> cksum)
+  { return (CKSUM<CKSUM_t::XOR>) ~cksum; }
 
 
 static inline uint8_t crc8_bits(uint8_t data)
@@ -43,15 +43,15 @@ static inline uint8_t crc8_bits(uint8_t data)
 }
 
 template<>
-TF_CKSUM<TF_CKSUM_t::CRC8> TF_CksumStart<TF_CKSUM_t::CRC8>(void)
+CKSUM<CKSUM_t::CRC8> CksumStart<CKSUM_t::CRC8>(void)
   { return 0; }
 
 template<>
-TF_CKSUM<TF_CKSUM_t::CRC8> TF_CksumAdd<TF_CKSUM_t::CRC8>(TF_CKSUM<TF_CKSUM_t::CRC8> cksum, uint8_t byte)
+CKSUM<CKSUM_t::CRC8> CksumAdd<CKSUM_t::CRC8>(CKSUM<CKSUM_t::CRC8> cksum, uint8_t byte)
   { return crc8_bits(byte ^ cksum); }
 
 template<>
-TF_CKSUM<TF_CKSUM_t::CRC8> TF_CksumEnd<TF_CKSUM_t::CRC8>(TF_CKSUM<TF_CKSUM_t::CRC8> cksum)
+CKSUM<CKSUM_t::CRC8> CksumEnd<CKSUM_t::CRC8>(CKSUM<CKSUM_t::CRC8> cksum)
   { return cksum; }
 
 
@@ -93,15 +93,15 @@ static const uint16_t crc16_table[256] = {
 };
 
 template<>
-TF_CKSUM<TF_CKSUM_t::CRC16> TF_CksumStart<TF_CKSUM_t::CRC16>(void)
+CKSUM<CKSUM_t::CRC16> CksumStart<CKSUM_t::CRC16>(void)
   { return 0; }
 
 template<>
-TF_CKSUM<TF_CKSUM_t::CRC16> TF_CksumAdd<TF_CKSUM_t::CRC16>(TF_CKSUM<TF_CKSUM_t::CRC16> cksum, uint8_t byte)
+CKSUM<CKSUM_t::CRC16> CksumAdd<CKSUM_t::CRC16>(CKSUM<CKSUM_t::CRC16> cksum, uint8_t byte)
   { return (cksum >> 8) ^ crc16_table[(cksum ^ byte) & 0xff]; }
 
 template<>
-TF_CKSUM<TF_CKSUM_t::CRC16> TF_CksumEnd<TF_CKSUM_t::CRC16>(TF_CKSUM<TF_CKSUM_t::CRC16> cksum)
+CKSUM<CKSUM_t::CRC16> CksumEnd<CKSUM_t::CRC16>(CKSUM<CKSUM_t::CRC16> cksum)
   { return cksum; }
 
 
@@ -153,15 +153,15 @@ static const uint32_t crc32_table[] = { /* CRC polynomial 0xedb88320 */
 };
 
 template<>
-TF_CKSUM<TF_CKSUM_t::CRC32> TF_CksumStart<TF_CKSUM_t::CRC32>(void)
-  { return (TF_CKSUM<TF_CKSUM_t::CRC32>)0xFFFFFFFF; }
+CKSUM<CKSUM_t::CRC32> CksumStart<CKSUM_t::CRC32>(void)
+  { return (CKSUM<CKSUM_t::CRC32>)0xFFFFFFFF; }
 
 template<>
-TF_CKSUM<TF_CKSUM_t::CRC32> TF_CksumAdd<TF_CKSUM_t::CRC32>(TF_CKSUM<TF_CKSUM_t::CRC32> cksum, uint8_t byte)
+CKSUM<CKSUM_t::CRC32> CksumAdd<CKSUM_t::CRC32>(CKSUM<CKSUM_t::CRC32> cksum, uint8_t byte)
   { return crc32_table[((cksum) ^ ((uint8_t)byte)) & 0xff] ^ ((cksum) >> 8); }
 
 template<>
-TF_CKSUM<TF_CKSUM_t::CRC32> TF_CksumEnd<TF_CKSUM_t::CRC32>(TF_CKSUM<TF_CKSUM_t::CRC32> cksum)
-  { return (TF_CKSUM<TF_CKSUM_t::CRC32>) ~cksum; }
+CKSUM<CKSUM_t::CRC32> CksumEnd<CKSUM_t::CRC32>(CKSUM<CKSUM_t::CRC32> cksum)
+  { return (CKSUM<CKSUM_t::CRC32>) ~cksum; }
 
 } // TinyFrame_n

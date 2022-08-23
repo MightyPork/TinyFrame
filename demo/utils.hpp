@@ -2,8 +2,8 @@
 // Created by MightyPork on 2017/10/15.
 //
 
-#ifndef TF_UTILS_H
-#define TF_UTILS_H
+#ifndef UTILS_H
+#define UTILS_H
 
 #include <cstdio>
 #include "../TinyFrame.hpp"
@@ -23,8 +23,8 @@ void dumpFrame(const uint8_t *buff, size_t len);
  *
  * @param msg
  */
-void dumpFrameInfo(TF_Msg *msg);
+void dumpFrameInfo(Msg *msg);
 
 } // TinyFrame_n
 
-#endif //TF_UTILS_H
+#endif //UTILS_H
