@@ -55,10 +55,10 @@ using TF_CKSUM = typename CKSUM_TYPE_MAP<TF_CKSUM_TYPE>::type;
 //---------------------------------------------------------------------------
 
 /** Peer bit enum (used for init) */
-typedef enum {
+enum class TF_Peer{
     TF_SLAVE = 0,
     TF_MASTER = 1,
-} TF_Peer;
+};
 
 
 /** Response from listeners */

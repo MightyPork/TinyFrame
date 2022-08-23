@@ -147,8 +147,8 @@ TinyFrame_n::TinyFrameConfig_t config = {
     .TF_PARSER_TIMEOUT_TICKS = 10U
 };
 
-TinyFrame_CRC16 tf_1(callbacks_1);
-TinyFrame_CRC16 tf_2(callbacks_2);
+TinyFrame_CRC16 tf_1(callbacks_1, TinyFrame_n::TF_Peer::TF_MASTER);
+TinyFrame_CRC16 tf_2(callbacks_2, TinyFrame_n::TF_Peer::TF_SLAVE);
 
 // TinyFrame_CRC16 tf16(callbacks16);
 // TinyFrame_CRC32 tf32_2(callbacks32, config);

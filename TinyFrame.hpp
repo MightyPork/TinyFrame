@@ -13,7 +13,6 @@
 
 
 //---------------------------------------------------------------------------
-#include <new> // placement new
 #include <string>
 //---------------------------------------------------------------------------
 
@@ -49,13 +48,14 @@ class TinyFrame{
         // forward declaration of constructor argument
         struct TF_RequiredCallbacks;
 
-        TinyFrame(const TF_RequiredCallbacks& cb, const TinyFrameConfig_t& config) : 
+        TinyFrame(const TF_RequiredCallbacks& cb, const TinyFrameConfig_t& config, const TF_Peer peer = TF_Peer::TF_SLAVE) : 
                     tfCallbacks(cb), // copy callback struct
                     tfConfig(config), // copy config struct
                     internal({}) // zero initialization
         { 
+            this->internal.peer_bit = peer;
         };
-        TinyFrame(const TF_RequiredCallbacks& cb) : TinyFrame(cb, TF_CONFIG_DEFAULT){ };
+        TinyFrame(const TF_RequiredCallbacks& cb, const TF_Peer peer = TF_Peer::TF_SLAVE) : TinyFrame(cb, TF_CONFIG_DEFAULT, peer){ };
 
         ~TinyFrame() = default;
 
@@ -401,48 +401,6 @@ class TinyFrame{
 
 }; // class TinyFrame
 
-// ---------------------------------- INIT ------------------------------
-
-/**
- * Initialize the TinyFrame engine.
- * This can also be used to completely reset it (removing all listeners etc).
- *
- * The field .userdata (or .usertag) can be used to identify different instances
- * in the TF_WriteImpl() function etc. Set this field after the init.
- *
- * This function is a wrapper around TF_InitStatic that calls malloc() to obtain
- * the instance.
- *
- * @param tf - instance
- * @param peer_bit - peer bit to use for self
- * @return TF instance or nullptr
- */
-template<TF_TEMPLATE_ARGS>
-TinyFrame<TF_TEMPLATE_PARMS> *TF_Init(TF_Peer peer_bit);
-
-
-/**
- * Initialize the TinyFrame engine using a statically allocated instance struct.
- *
- * The .userdata / .usertag field is preserved when TF_InitStatic is called.
- *
- * @param tf - instance
- * @param peer_bit - peer bit to use for self
- * @return success
- */
-template<TF_TEMPLATE_ARGS>
-bool TF_InitStatic(TinyFrame<TF_TEMPLATE_PARMS> *tf, TF_Peer peer_bit);
-
-/**
- * De-init the dynamically allocated TF instance
- *
- * @param tf - instance
- */
-template<TF_TEMPLATE_ARGS>
-void TF_DeInit(TinyFrame<TF_TEMPLATE_PARMS> *tf);
-
-
-
 /**
  * Frame parser internal state.
  */
@@ -479,56 +437,6 @@ void TF_DeInit(TinyFrame<TF_TEMPLATE_PARMS> *tf);
         tf->internal.soft_lock = false;
     }
 #endif
-
-
-//region Init
-
-/** Init with a user-allocated buffer */
-template<TF_TEMPLATE_ARGS>
-bool _TF_FN TF_InitStatic(TinyFrame<TF_TEMPLATE_PARMS> *tf, TF_Peer peer_bit)
-{
-    if (tf == nullptr) {
-        // TF_InitStatic() failed, tf is null.
-        return false;
-    }
-
-    // Zero it out, keeping user config
-    uint32_t usertag = tf->internal.usertag;
-    void * userdata = tf->internal.userdata;
-
-    TinyFrame<TF_TEMPLATE_PARMS>* ptr = new((void*)tf) TinyFrame<TF_TEMPLATE_PARMS>; // placement new
-
-    tf->internal.usertag = usertag;
-    tf->internal.userdata = userdata;
-
-    tf->internal.peer_bit = peer_bit;
-    return ptr == tf; // should always be valid
-}
-
-/** Init with malloc */
-template<TF_TEMPLATE_ARGS>
-TinyFrame<TF_TEMPLATE_PARMS> * _TF_FN TF_Init(TF_Peer peer_bit)
-{
-    TinyFrame<TF_TEMPLATE_PARMS> *tf = new TinyFrame<TF_TEMPLATE_PARMS>();
-    if (!tf) {
-        // TF_Init() failed, out of memory.
-        return nullptr;
-    }
-
-    TF_InitStatic(tf, peer_bit);
-    return tf;
-}
-
-/** Release the struct */
-template<TF_TEMPLATE_ARGS>
-void TF_DeInit(TinyFrame<TF_TEMPLATE_PARMS> *tf)
-{
-    if (tf == nullptr) return;
-    delete(tf);
-}
-
-//endregion Init
-
 
 //region Listeners
 
@@ -1081,7 +989,7 @@ uint32_t _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_ComposeHead(uint8_t *outbuff, T
     }
     else {
         id = (TF_ID) (this->internal.next_id++ & TF_ID_MASK);
-        if (this->internal.peer_bit) {
+        if (this->internal.peer_bit != TF_Peer::TF_SLAVE) {
             id |= TF_ID_PEERBIT;
         }
     }
