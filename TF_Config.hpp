@@ -59,9 +59,6 @@ typedef size_t TF_COUNT;
 // Generic listeners (fallback if no other listener catches it)
 #define TF_MAX_GEN_LST  5
 
-// Whether to use mutex - requires you to implement TF_ClaimTx() and TF_ReleaseTx()
-#define TF_USE_MUTEX  1
-
 //------------------------- End of user config ------------------------------
 } // TinyFrame_n
 #endif //TF_CONFIG_H

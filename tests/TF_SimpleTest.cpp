@@ -127,16 +127,19 @@ TF_Result queryTimeoutListener(){
 const TinyFrame_CRC16::TF_RequiredCallbacks callbacks_1 = {
     .TF_WriteImpl = TinyFrame_n::TF_WriteImpl_1,
     .TF_Error = TinyFrame_n::TF_Error_1,
-    .TF_ClaimTx =   TinyFrame_n::TF_ClaimTx, 
-    .TF_ReleaseTx = TinyFrame_n::TF_ReleaseTx,
 };
 
 const TinyFrame_CRC16::TF_RequiredCallbacks callbacks_2 = {
     .TF_WriteImpl = TinyFrame_n::TF_WriteImpl_2,
     .TF_Error = TinyFrame_n::TF_Error_2,
+};
+
+const TinyFrame_CRC16::TF_OptionalCallbacks callbacks_Mutex_1 = {
     .TF_ClaimTx =   TinyFrame_n::TF_ClaimTx, 
     .TF_ReleaseTx = TinyFrame_n::TF_ReleaseTx,
 };
+
+
 
 TinyFrame_n::TinyFrameConfig_t config = {
     .TF_ID_BYTES             = 1U,
