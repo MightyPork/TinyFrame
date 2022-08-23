@@ -87,37 +87,37 @@ TF_CKSUM<TF_CKSUM_t::CUSTOM8> TF_CksumEnd<TF_CKSUM_t::CUSTOM8>(TF_CKSUM<TF_CKSUM
 // --------- Example Type Listener ---------
 TF_Result genericListener(TF_Msg *msg){
     printf("Received Message - Generic Listener : %s\n", msg->data);    
-    return TF_STAY;
+    return TF_Result::TF_STAY;
 }
 
 TF_Result typeListener123(TF_Msg *msg){
     printf("Received Message - Type Listener 123: %s\n", msg->data);    
-    return TF_STAY;
+    return TF_Result::TF_STAY;
 }
 
 TF_Result typeTimeoutListener123(){
     printf("Timeout - Type Listener 123\n");    
-    return TF_STAY;
+    return TF_Result::TF_STAY;
 }
 
 TF_Result idListener234(TF_Msg *msg){
     printf("Received Message - ID Listener 234: %s\n", msg->data);    
-    return TF_CLOSE;
+    return TF_Result::TF_CLOSE;
 }
 
 TF_Result idTimeoutListener234(){
     printf("Timeout - ID Listener 234\n");
-    return TF_STAY;
+    return TF_Result::TF_STAY;
 }
 
 TF_Result queryListener(TF_Msg *msg){
     printf("Received Message - Query Listener: %s\n", msg->data);    
-    return TF_CLOSE;
+    return TF_Result::TF_CLOSE;
 }
 
 TF_Result queryTimeoutListener(){
     printf("Timeout - Query Listener\n");
-    return TF_STAY;
+    return TF_Result::TF_STAY;
 }
 
 } // TinyFrame_n

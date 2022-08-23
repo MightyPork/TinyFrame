@@ -62,18 +62,18 @@ enum class TF_Peer{
 
 
 /** Response from listeners */
-typedef enum {
+enum class TF_Result{
     TF_NEXT = 0,   //!< Not handled, let other listeners handle it
     TF_STAY = 1,   //!< Handled, stay
     TF_RENEW = 2,  //!< Handled, stay, renew - useful only with listener timeout
     TF_CLOSE = 3,  //!< Handled, remove self
-} TF_Result;
+};
 
 
 // ---------------------------------- INTERNAL ----------------------------------
 // This is publicly visible only to allow static init.
 
-enum TF_State_ {
+enum class TF_State_ {
     TFState_SOF = 0,      //!< Wait for SOF
     TFState_LEN,          //!< Wait for Number Of Bytes
     TFState_HEAD_CKSUM,   //!< Wait for header Checksum

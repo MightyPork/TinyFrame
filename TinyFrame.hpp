@@ -654,12 +654,12 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_HandleReceivedMessage()
             ilst->userdata = msg.userdata; // put it back (may have changed the pointer or set to nullptr)
             ilst->userdata2 = msg.userdata2; // put it back (may have changed the pointer or set to nullptr)
 
-            if (res != TF_NEXT) {
+            if (res != TF_Result::TF_NEXT) {
                 // if it's TF_CLOSE, we assume user already cleaned up userdata
-                if (res == TF_RENEW) {
+                if (res == TF_Result::TF_RENEW) {
                     this->renew_id_listener(ilst);
                 }
-                else if (res == TF_CLOSE) {
+                else if (res == TF_Result::TF_CLOSE) {
                     // Set userdata to nullptr to avoid calling user for cleanup
                     ilst->userdata = nullptr;
                     ilst->userdata2 = nullptr;
@@ -681,11 +681,11 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_HandleReceivedMessage()
         if (tlst->fn && tlst->type == msg.type) {
             res = tlst->fn(&msg);
 
-            if (res != TF_NEXT) {
+            if (res != TF_Result::TF_NEXT) {
                 // type listeners don't have userdata.
                 // TF_RENEW doesn't make sense here because type listeners don't expire = same as TF_STAY
 
-                if (res == TF_CLOSE) {
+                if (res == TF_Result::TF_CLOSE) {
                     this->cleanup_type_listener(i, tlst);
                 }
                 return;
@@ -700,7 +700,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_HandleReceivedMessage()
         if (glst->fn) {
             res = glst->fn(&msg);
 
-            if (res != TF_NEXT) {
+            if (res != TF_Result::TF_NEXT) {
                 // generic listeners don't have userdata.
                 // TF_RENEW doesn't make sense here because generic listeners don't expire = same as TF_STAY
 
@@ -708,7 +708,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_HandleReceivedMessage()
                 // ever actually remove them. They're most useful as default callbacks if no other listener
                 // handled the message.
 
-                if (res == TF_CLOSE) {
+                if (res == TF_Result::TF_CLOSE) {
                     this->cleanup_generic_listener(i, glst);
                 }
                 return;
@@ -757,7 +757,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_Accept(const uint8_t *buffer, uint3
 template<TF_TEMPLATE_ARGS>
 void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_ResetParser()
 {
-    this->internal.state = TFState_SOF;
+    this->internal.state = TF_State_::TFState_SOF;
     // more init will be done by the parser when the first byte is received
 }
 
@@ -773,7 +773,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::pars_begin_frame() {
     this->internal.discard_data = false;
 
     // Enter ID state
-    this->internal.state = TFState_ID;
+    this->internal.state = TF_State_::TFState_ID;
     this->internal.rxi = 0;
 }
 
@@ -783,7 +783,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
 {
     // Parser timeout - clear
     if (this->internal.parser_timeout_ticks >= this->tfConfig.TF_PARSER_TIMEOUT_TICKS) {
-        if (this->internal.state != TFState_SOF) {
+        if (this->internal.state != TF_State_::TFState_SOF) {
             this->TF_ResetParser();
             this->tfCallbacks.TF_Error("Parser timeout");
         }
@@ -798,53 +798,53 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
                                    if (++this->internal.rxi == typesize)
 
     if(!this->tfConfig.TF_USE_SOF_BYTE){
-        if (this->internal.state == TFState_SOF) {
+        if (this->internal.state == TF_State_::TFState_SOF) {
             this->pars_begin_frame();
         }
     }
 
     //@formatter:off
     switch (this->internal.state) {
-        case TFState_SOF:
+        case TF_State_::TFState_SOF:
             if (c == this->tfConfig.TF_SOF_BYTE) {
                 this->pars_begin_frame();
             }
             break;
 
-        case TFState_ID:
+        case TF_State_::TFState_ID:
             CKSUM_ADD(this->internal.cksum, c);
             COLLECT_NUMBER(this->internal.id, TF_ID, this->tfConfig.TF_ID_BYTES) {
                 // Enter LEN state
-                this->internal.state = TFState_LEN;
+                this->internal.state = TF_State_::TFState_LEN;
                 this->internal.rxi = 0;
             }
             break;
 
-        case TFState_LEN:
+        case TF_State_::TFState_LEN:
             CKSUM_ADD(this->internal.cksum, c);
             COLLECT_NUMBER(this->internal.len, TF_LEN, this->tfConfig.TF_LEN_BYTES) {
                 // Enter TYPE state
-                this->internal.state = TFState_TYPE;
+                this->internal.state = TF_State_::TFState_TYPE;
                 this->internal.rxi = 0;
             }
             break;
 
-        case TFState_TYPE:
+        case TF_State_::TFState_TYPE:
             CKSUM_ADD(this->internal.cksum, c);
             COLLECT_NUMBER(this->internal.type, TF_TYPE, this->tfConfig.TF_TYPE_BYTES) {
                 if(TF_CKSUM_TYPE == TF_CKSUM_t::NONE){
-                    this->internal.state = TFState_DATA;
+                    this->internal.state = TF_State_::TFState_DATA;
                     this->internal.rxi = 0;
                 }else{
                     // enter HEAD_CKSUM state
-                    this->internal.state = TFState_HEAD_CKSUM;
+                    this->internal.state = TF_State_::TFState_HEAD_CKSUM;
                     this->internal.rxi = 0;
                     this->internal.ref_cksum = 0;
                 }
             }
             break;
 
-        case TFState_HEAD_CKSUM:
+        case TF_State_::TFState_HEAD_CKSUM:
             COLLECT_NUMBER(this->internal.ref_cksum, TF_CKSUM<TF_CKSUM_TYPE>, sizeof(TF_CKSUM<TF_CKSUM_TYPE>)) {
                 // Check the header checksum against the computed value
                 CKSUM_FINALIZE(this->internal.cksum);
@@ -863,7 +863,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
                 }
 
                 // Enter DATA state
-                this->internal.state = TFState_DATA;
+                this->internal.state = TF_State_::TFState_DATA;
                 this->internal.rxi = 0;
 
                 CKSUM_RESET(this->internal.cksum); // Start collecting the payload
@@ -877,7 +877,7 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
             }
             break;
 
-        case TFState_DATA:
+        case TF_State_::TFState_DATA:
             if (this->internal.discard_data) {
                 this->internal.rxi++;
             } else {
@@ -892,14 +892,14 @@ void _TF_FN TinyFrame<TF_TEMPLATE_PARMS>::TF_AcceptChar(unsigned char c)
                     this->TF_ResetParser();
                 }else{
                     // Enter DATA_CKSUM state
-                    this->internal.state = TFState_DATA_CKSUM;
+                    this->internal.state = TF_State_::TFState_DATA_CKSUM;
                     this->internal.rxi = 0;
                     this->internal.ref_cksum = 0;
                 }
             }
             break;
 
-        case TFState_DATA_CKSUM:
+        case TF_State_::TFState_DATA_CKSUM:
             COLLECT_NUMBER(this->internal.ref_cksum, TF_CKSUM<TF_CKSUM_TYPE>, sizeof(TF_CKSUM<TF_CKSUM_TYPE>)) {
                 // Check the header checksum against the computed value
                 CKSUM_FINALIZE(this->internal.cksum);
