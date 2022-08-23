@@ -1,9 +1,12 @@
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include "../../TinyFrame.hpp"
 #include "../utils.hpp"
 
-TinyFrame *demo_tf;
+using namespace TinyFrame_n;
+using TinyFrame_Demo=TinyFrame<>;
+
+TinyFrame_Demo *demo_tf;
 
 extern const char *romeo;
 
@@ -11,20 +14,23 @@ extern const char *romeo;
  * This function should be defined in the application code.
  * It implements the lowest layer - sending bytes to UART (or other)
  */
-void WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
+void WriteImpl(const uint8_t *buff, uint32_t len)
 {
     printf("--------------------\n");
     printf("\033[32mWriteImpl - sending frame:\033[0m\n");
     dumpFrame(buff, len);
 
     // Send it back as if we received it
-    Accept(tf, buff, len);
+    demo_tf->Accept(buff, len);
+}
+
+void ErrorCallback(std::string message){
+    printf("%s", message);
 }
 
 /** An example listener function */
-Result myListener(TinyFrame *tf, Msg *msg)
+Result myListener(Msg *msg)
 {
-    (void)tf;
     dumpFrameInfo(msg);
     if (strcmp((const char *) msg->data, romeo) == 0) {
         printf("FILE TRANSFERRED OK!\r\n");
@@ -32,24 +38,24 @@ Result myListener(TinyFrame *tf, Msg *msg)
     else {
         printf("FAIL!!!!\r\n");
     }
-    return STAY;
+    return Result::STAY;
 }
 
-void main(void)
+int main(void)
 {
     Msg msg;
 
     // Set up the TinyFrame library
-    demo_tf = Init(MASTER); // 1 = master, 0 = slave
-    AddGenericListener(demo_tf, myListener);
+    demo_tf = new TinyFrame_Demo({.WriteImpl=&WriteImpl, .Error=&ErrorCallback}, Peer::MASTER); // 1 = master, 0 = slave
+    demo_tf->AddGenericListener(myListener);
 
     printf("------ Simulate sending a LOOONG message --------\n");
 
-    ClearMsg(&msg);
+    demo_tf->ClearMsg(&msg);
     msg.type = 0x22;
     msg.data = (pu8) romeo;
     msg.len = (LEN) strlen(romeo);
-    Send(demo_tf, &msg);
+    demo_tf->Send(&msg);
 }
 
 const char *romeo = "THE TRAGEDY OF ROMEO AND JULIET\n"

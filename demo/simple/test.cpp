@@ -4,10 +4,9 @@
 #include "../utils.hpp"
 
 using namespace TinyFrame_n;
+using TinyFrame_Demo=TinyFrame<>;
 
-using TinyFrame_Default=TinyFrame<>;
-
-extern TinyFrame_Default demo_tf;
+extern TinyFrame_Demo demo_tf;
 
 bool do_corrupt = false;
 
@@ -51,7 +50,7 @@ Result testIdListener(Msg *msg)
     return Result::CLOSE;
 }
 
-TinyFrame_Default demo_tf(TinyFrame_Default::RequiredCallbacks{
+TinyFrame_Demo demo_tf(TinyFrame_Demo::RequiredCallbacks{
     .WriteImpl = WriteImpl,
     .Error = Error
 }, Peer::MASTER);

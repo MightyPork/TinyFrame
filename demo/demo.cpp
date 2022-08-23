@@ -2,7 +2,7 @@
 // Created by MightyPork on 2017/10/15.
 //
 
-#include "demo.h"
+#include "demo.hpp"
 
 // those magic defines are needed so we can use clone()
 #define _GNU_SOURCE
@@ -13,16 +13,19 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <string.h>
+#include <cstring>
 #include <arpa/inet.h>
 #include <signal.h>
 #include <malloc.h>
-#include <stdlib.h>
+#include <cstdlib>
+
+using namespace TinyFrame_n;
 
 volatile int sockfd = -1;
 volatile bool conn_disband = false;
 
-TinyFrame *demo_tf;
+
+TinyFrame_Demo *demo_tf;
 
 /**
  * Close socket
@@ -39,7 +42,7 @@ void demo_disconn(void)
  * @param buff
  * @param len
  */
-void WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
+void WriteImpl(const uint8_t *buff, uint32_t len)
 {
     printf("\033[32mWriteImpl - sending frame:\033[0m\n");
     dumpFrame(buff, len);
@@ -53,6 +56,9 @@ void WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
     }
 }
 
+void ErrorCallback(std::string message){
+    printf("%s", message);
+}
 
 /**
  * Client bg thread
@@ -97,7 +103,7 @@ static int demo_client(void *unused)
     while ((n = read(sockfd, recvBuff, sizeof(recvBuff) - 1)) > 0) {
         printf("\033[36m--- RX %ld bytes ---\033[0m\n", n);
         dumpFrame(recvBuff, (size_t) n);
-        Accept(demo_tf, recvBuff, (size_t) n);
+        demo_tf->Accept(recvBuff, (size_t) n);
     }
     return 0;
 }
@@ -149,7 +155,7 @@ static int demo_server(void *unused)
         while ((n = read(sockfd, recvBuff, sizeof(recvBuff) - 1)) > 0 && !conn_disband) {
             printf("\033[36m--- RX %ld bytes ---\033[0m\n", n);
             dumpFrame(recvBuff, n);
-            Accept(demo_tf, recvBuff, (size_t) n);
+            demo_tf->Accept(recvBuff, (size_t) n);
         }
 
         if (n < 0) {
@@ -209,7 +215,7 @@ void demo_init(Peer peer)
 
     // CLONE_VM    --- share heap
     // CLONE_FILES --- share stdout and stderr
-    if (peer == MASTER) {
+    if (peer == Peer::MASTER) {
         retc = clone(&demo_client, (char *) stack + 8192, CLONE_VM | CLONE_FILES, 0);
     }
     else {

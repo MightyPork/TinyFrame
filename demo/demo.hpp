@@ -9,9 +9,16 @@
 #include "../TinyFrame.hpp"
 #include "utils.hpp"
 
+using namespace TinyFrame_n;
+using TinyFrame_Demo=TinyFrame<>;
+
 #define PORT 9798
 
-extern TinyFrame *demo_tf;
+extern TinyFrame_Demo *demo_tf;
+
+extern void WriteImpl(const uint8_t *buff, uint32_t len);
+
+extern void ErrorCallback(std::string message);
 
 /** Sleep and wait for ^C */
 void demo_sleep(void);

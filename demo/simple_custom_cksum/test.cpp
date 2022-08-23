@@ -1,9 +1,12 @@
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include "../../TinyFrame.hpp"
 #include "../utils.hpp"
 
-TinyFrame *demo_tf;
+using namespace TinyFrame_n;
+using TinyFrame_Demo=TinyFrame<>;
+
+TinyFrame_Demo *demo_tf;
 
 bool do_corrupt = false;
 
@@ -11,7 +14,7 @@ bool do_corrupt = false;
  * This function should be defined in the application code.
  * It implements the lowest layer - sending bytes to UART (or other)
  */
-void WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
+void WriteImpl(const uint8_t *buff, uint32_t len)
 {
     printf("--------------------\n");
     printf("\033[32mWriteImpl - sending frame:\033[0m\n");
@@ -25,39 +28,43 @@ void WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
     dumpFrame(xbuff, len);
 
     // Send it back as if we received it
-    Accept(tf, xbuff, len);
+    demo_tf->Accept(xbuff, len);
+}
+
+void ErrorCallback(std::string message){
+    printf("%s", message);
 }
 
 /** An example listener function */
-Result myListener(TinyFrame *tf, Msg *msg)
+Result myListener(Msg *msg)
 {
     dumpFrameInfo(msg);
-    return STAY;
+    return Result::STAY;
 }
 
-Result testIdListener(TinyFrame *tf, Msg *msg)
+Result testIdListener(Msg *msg)
 {
     printf("OK - ID Listener triggered for msg!\n");
     dumpFrameInfo(msg);
-    return CLOSE;
+    return Result::CLOSE;
 }
 
-void main(void)
+int main(void)
 {
     Msg msg;
     const char *longstr = "Lorem ipsum dolor sit amet.";
 
     // Set up the TinyFrame library
-    demo_tf = Init(MASTER); // 1 = master, 0 = slave
-    AddGenericListener(demo_tf, myListener);
+    demo_tf = new TinyFrame_Demo({.WriteImpl=&WriteImpl, .Error=&ErrorCallback}, Peer::MASTER); // 1 = master, 0 = slave
+    demo_tf->AddGenericListener(myListener);
 
     printf("------ Simulate sending a message --------\n");
 
-    ClearMsg(&msg);
+    demo_tf->ClearMsg(&msg);
     msg.type = 0x22;
     msg.data = (pu8) "Hello TinyFrame";
     msg.len = 16;
-    Send(demo_tf, &msg);
+    demo_tf->Send(&msg);
     
     printf("This should fail:\n");
     
@@ -66,23 +73,25 @@ void main(void)
     msg.type = 0x44;
     msg.data = (pu8) "Hello2";
     msg.len = 7;
-    Send(demo_tf, &msg);
+    demo_tf->Send(&msg);
 }
 
 
 // a made up custom checksum - just to test it's used and works
-
-CKSUM CksumStart(void)
+template<>
+uint8_t TinyFrame_n::CksumStart<CKSUM_t::CUSTOM8>(void)
 {
     return 0;
 }
 
-CKSUM CksumAdd(CKSUM cksum, uint8_t byte)
+template<>
+uint8_t TinyFrame_n::CksumAdd<CKSUM_t::CUSTOM8>(uint8_t cksum, uint8_t byte)
 {
     return cksum ^ byte + 1;
 }
 
-CKSUM CksumEnd(CKSUM cksum)
+template<>
+uint8_t TinyFrame_n::CksumEnd<CKSUM_t::CUSTOM8>(uint8_t cksum)
 {
     return ~cksum ^ 0xA5;
 }
