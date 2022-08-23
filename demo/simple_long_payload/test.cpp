@@ -11,18 +11,18 @@ extern const char *romeo;
  * This function should be defined in the application code.
  * It implements the lowest layer - sending bytes to UART (or other)
  */
-void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
+void WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
 {
     printf("--------------------\n");
-    printf("\033[32mTF_WriteImpl - sending frame:\033[0m\n");
+    printf("\033[32mWriteImpl - sending frame:\033[0m\n");
     dumpFrame(buff, len);
 
     // Send it back as if we received it
-    TF_Accept(tf, buff, len);
+    Accept(tf, buff, len);
 }
 
 /** An example listener function */
-TF_Result myListener(TinyFrame *tf, TF_Msg *msg)
+Result myListener(TinyFrame *tf, Msg *msg)
 {
     (void)tf;
     dumpFrameInfo(msg);
@@ -32,45 +32,24 @@ TF_Result myListener(TinyFrame *tf, TF_Msg *msg)
     else {
         printf("FAIL!!!!\r\n");
     }
-    return TF_STAY;
+    return STAY;
 }
 
 void main(void)
 {
-    TF_Msg msg;
+    Msg msg;
 
     // Set up the TinyFrame library
-    demo_tf = TF_Init(TF_MASTER); // 1 = master, 0 = slave
-    TF_AddGenericListener(demo_tf, myListener);
+    demo_tf = Init(MASTER); // 1 = master, 0 = slave
+    AddGenericListener(demo_tf, myListener);
 
     printf("------ Simulate sending a LOOONG message --------\n");
 
-    // We prepare a message without .data but with a set .len
-    TF_ClearMsg(&msg);
+    ClearMsg(&msg);
     msg.type = 0x22;
-    msg.len = (TF_LEN) strlen(romeo);
-    
-    // Start the multipart frame
-    TF_Send_Multipart(demo_tf, &msg);
-    
-    // Now we send the payload in as many pieces as we like.
-    // Careful - TF transmitter is locked until we close the multipart frame
-    
-    uint32_t remain = strlen(romeo);
-    const uint8_t* toSend = (const uint8_t*)romeo;
-    
-    while (remain > 0) {
-      uint32_t chunk = (remain>16) ? 16 : remain;
-      
-      // Send a piece
-      TF_Multipart_Payload(demo_tf, toSend, chunk);
-      
-      remain -= chunk;
-      toSend += chunk;
-    }
-    
-    // Done, close
-    TF_Multipart_Close(demo_tf);
+    msg.data = (pu8) romeo;
+    msg.len = (LEN) strlen(romeo);
+    Send(demo_tf, &msg);
 }
 
 const char *romeo = "THE TRAGEDY OF ROMEO AND JULIET\n"

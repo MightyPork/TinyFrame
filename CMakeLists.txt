@@ -6,22 +6,28 @@ project(tf)
 
 set(CMAKE_CXX_STANDARD 14)
 
-set(SOURCE_FILES
+set(SOURCES_TINYFRAME
         TinyFrame.hpp
         TinyFrame_CRC.cpp
         TinyFrame_CRC.hpp
         TinyFrame_Types.hpp
-        tests/TF_SimpleTest.cpp
-
-        # demo/simple/test.cpp
-        # demo/utils.cpp
-        # demo/utils.hpp
-        
-        # demo/socket_demo/master.c
-        # demo/socket_demo/slave.c
-        # demo/socket_demo/TF_Config.h
-        # demo/demo.c
-        # demo/demo.h
         )
 
-add_executable(tf ${SOURCE_FILES})
+set(SOURCES_DEMO
+        demo/utils.cpp
+        demo/utils.hpp
+        )
+
+add_executable(Tests ${SOURCES_TINYFRAME} tests/TF_SimpleTest.cpp)
+
+add_executable(demo.simple ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/simple/test.cpp)
+add_executable(demo.simple_custom_cksum ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/simple_custom_cksum/test.cpp)
+add_executable(demo.simple_long_payload ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/simple_long_payload/test.cpp)
+add_executable(demo.simple_multipart ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/simple_multipart/test.cpp)
+add_executable(demo.socket_demo.master ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/socket_demo/master.cpp)
+add_executable(demo.socket_demo.slave ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/socket_demo/slave.cpp)
+
+add_executable(Demo ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/demo.hpp demo/demo.cpp)
+
+
+

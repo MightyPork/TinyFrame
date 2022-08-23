@@ -39,9 +39,9 @@ void demo_disconn(void)
  * @param buff
  * @param len
  */
-void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
+void WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
 {
-    printf("\033[32mTF_WriteImpl - sending frame:\033[0m\n");
+    printf("\033[32mWriteImpl - sending frame:\033[0m\n");
     dumpFrame(buff, len);
     usleep(1000);
 
@@ -97,7 +97,7 @@ static int demo_client(void *unused)
     while ((n = read(sockfd, recvBuff, sizeof(recvBuff) - 1)) > 0) {
         printf("\033[36m--- RX %ld bytes ---\033[0m\n", n);
         dumpFrame(recvBuff, (size_t) n);
-        TF_Accept(demo_tf, recvBuff, (size_t) n);
+        Accept(demo_tf, recvBuff, (size_t) n);
     }
     return 0;
 }
@@ -149,7 +149,7 @@ static int demo_server(void *unused)
         while ((n = read(sockfd, recvBuff, sizeof(recvBuff) - 1)) > 0 && !conn_disband) {
             printf("\033[36m--- RX %ld bytes ---\033[0m\n", n);
             dumpFrame(recvBuff, n);
-            TF_Accept(demo_tf, recvBuff, (size_t) n);
+            Accept(demo_tf, recvBuff, (size_t) n);
         }
 
         if (n < 0) {
@@ -192,7 +192,7 @@ void demo_sleep(void)
  *
  * @param peer what peer we are
  */
-void demo_init(TF_Peer peer)
+void demo_init(Peer peer)
 {
     signal(SIGTERM, signal_handler);
     signal(SIGINT, signal_handler);
@@ -205,11 +205,11 @@ void demo_init(TF_Peer peer)
         return;
     }
 
-    printf("Starting %s...\n", peer == TF_MASTER ? "MASTER" : "SLAVE");
+    printf("Starting %s...\n", peer == MASTER ? "MASTER" : "SLAVE");
 
     // CLONE_VM    --- share heap
     // CLONE_FILES --- share stdout and stderr
-    if (peer == TF_MASTER) {
+    if (peer == MASTER) {
         retc = clone(&demo_client, (char *) stack + 8192, CLONE_VM | CLONE_FILES, 0);
     }
     else {
