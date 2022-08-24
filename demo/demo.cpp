@@ -5,8 +5,13 @@
 #include "demo.hpp"
 
 // those magic defines are needed so we can use clone()
+#ifndef __USE_GNU
 #define _GNU_SOURCE
+#endif
+
+#ifndef __USE_GNU
 #define __USE_GNU
+#endif
 
 #include <sched.h>
 
@@ -57,7 +62,7 @@ void WriteImpl(const uint8_t *buff, uint32_t len)
 }
 
 void ErrorCallback(std::string message){
-    printf("%s", message);
+    printf("%s", message.c_str());
 }
 
 /**
@@ -211,7 +216,7 @@ void demo_init(Peer peer)
         return;
     }
 
-    printf("Starting %s...\n", peer == MASTER ? "MASTER" : "SLAVE");
+    printf("Starting %s...\n", peer == Peer::MASTER ? "MASTER" : "SLAVE");
 
     // CLONE_VM    --- share heap
     // CLONE_FILES --- share stdout and stderr

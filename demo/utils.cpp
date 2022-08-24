@@ -27,10 +27,10 @@ void dumpFrame(const uint8_t *buff, size_t len)
 void dumpFrameInfo(Msg *msg)
 {
     printf("\033[33mFrame info\n"
-               "  type: %02Xh\n"
+               "  type: %0lXh\n"
                "  data: \"%.*s\"\n"
-               "   len: %u\n"
-               "    id: %Xh\033[0m\n\n",
-           msg->type, msg->len, msg->data, msg->len, msg->frame_id);
+               "   len: %lu\n"
+               "    id: %lXh\033[0m\n\n",
+           (size_t)msg->type, (int)msg->len, msg->data, (size_t)msg->len, (size_t)msg->frame_id);
 }
 } // TinyFrame_n
