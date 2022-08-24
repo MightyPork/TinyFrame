@@ -1,7 +1,8 @@
 #ifndef TinyFrame_TypesHPP
 #define TinyFrame_TypesHPP
 
-#include <cstdint>  // for uint8_t etc
+#include <cstdint>  // uint8_t etc
+#include <cstdlib> // size_t
 
 namespace TinyFrame_n{
 
