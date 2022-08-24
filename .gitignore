@@ -33,8 +33,9 @@
 *.dSYM/
 *.su
 
-cmake-build-debug/
+build/
 tf.bin
 
 .idea/
+.vscode/
 

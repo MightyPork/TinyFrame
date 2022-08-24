@@ -2,8 +2,10 @@
 // Created by MightyPork on 2017/10/15.
 //
 
-#include "utils.h"
-#include <stdio.h>
+#include "utils.hpp"
+#include <cstdio>
+
+namespace TinyFrame_n{
 
 // helper func for testing
 void dumpFrame(const uint8_t *buff, size_t len)
@@ -22,7 +24,7 @@ void dumpFrame(const uint8_t *buff, size_t len)
     printf("--- end of frame ---\n\n");
 }
 
-void dumpFrameInfo(TF_Msg *msg)
+void dumpFrameInfo(Msg *msg)
 {
     printf("\033[33mFrame info\n"
                "  type: %02Xh\n"
@@ -31,3 +33,4 @@ void dumpFrameInfo(TF_Msg *msg)
                "    id: %Xh\033[0m\n\n",
            msg->type, msg->len, msg->data, msg->len, msg->frame_id);
 }
+} // TinyFrame_n

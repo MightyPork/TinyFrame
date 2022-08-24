@@ -2,11 +2,13 @@
 // Created by MightyPork on 2017/10/15.
 //
 
-#ifndef TF_UTILS_H
-#define TF_UTILS_H
+#ifndef UTILS_H
+#define UTILS_H
 
-#include <stdio.h>
-#include "../TinyFrame.h"
+#include <cstdio>
+#include "../TinyFrame.hpp"
+
+namespace TinyFrame_n{
 
 /** pointer to unsigned char */
 typedef unsigned char* pu8;
@@ -21,6 +23,8 @@ void dumpFrame(const uint8_t *buff, size_t len);
  *
  * @param msg
  */
-void dumpFrameInfo(TF_Msg *msg);
+void dumpFrameInfo(Msg *msg);
 
-#endif //TF_UTILS_H
+} // TinyFrame_n
+
+#endif //UTILS_H

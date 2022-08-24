@@ -1,9 +1,12 @@
-#include <stdio.h>
-#include <string.h>
-#include "../../TinyFrame.h"
-#include "../utils.h"
+#include <cstdio>
+#include <cstring>
+#include "../../TinyFrame.hpp"
+#include "../utils.hpp"
 
-TinyFrame *demo_tf;
+using namespace TinyFrame_n;
+using TinyFrame_Demo=TinyFrame<>;
+
+TinyFrame_Demo *demo_tf;
 
 extern const char *romeo;
 
@@ -11,20 +14,23 @@ extern const char *romeo;
  * This function should be defined in the application code.
  * It implements the lowest layer - sending bytes to UART (or other)
  */
-void TF_WriteImpl(TinyFrame *tf, const uint8_t *buff, uint32_t len)
+void WriteImpl(const uint8_t *buff, uint32_t len)
 {
     printf("--------------------\n");
-    printf("\033[32mTF_WriteImpl - sending frame:\033[0m\n");
+    printf("\033[32mWriteImpl - sending frame:\033[0m\n");
     dumpFrame(buff, len);
 
     // Send it back as if we received it
-    TF_Accept(tf, buff, len);
+    demo_tf->Accept(buff, len);
+}
+
+void ErrorCallback(std::string message){
+    printf("%s", message);
 }
 
 /** An example listener function */
-TF_Result myListener(TinyFrame *tf, TF_Msg *msg)
+Result myListener(Msg *msg)
 {
-    (void)tf;
     dumpFrameInfo(msg);
     if (strcmp((const char *) msg->data, romeo) == 0) {
         printf("FILE TRANSFERRED OK!\r\n");
@@ -32,26 +38,26 @@ TF_Result myListener(TinyFrame *tf, TF_Msg *msg)
     else {
         printf("FAIL!!!!\r\n");
     }
-    return TF_STAY;
+    return Result::STAY;
 }
 
-void main(void)
+int main(void)
 {
-    TF_Msg msg;
+    Msg msg;
 
     // Set up the TinyFrame library
-    demo_tf = TF_Init(TF_MASTER); // 1 = master, 0 = slave
-    TF_AddGenericListener(demo_tf, myListener);
+    demo_tf = new TinyFrame_Demo({.WriteImpl=&WriteImpl, .Error=&ErrorCallback}, Peer::MASTER); // 1 = master, 0 = slave
+    demo_tf->AddGenericListener(myListener);
 
     printf("------ Simulate sending a LOOONG message --------\n");
 
     // We prepare a message without .data but with a set .len
-    TF_ClearMsg(&msg);
+    demo_tf->ClearMsg(&msg);
     msg.type = 0x22;
-    msg.len = (TF_LEN) strlen(romeo);
+    msg.len = (LEN) strlen(romeo);
     
     // Start the multipart frame
-    TF_Send_Multipart(demo_tf, &msg);
+    demo_tf->Send_Multipart(&msg);
     
     // Now we send the payload in as many pieces as we like.
     // Careful - TF transmitter is locked until we close the multipart frame
@@ -63,14 +69,14 @@ void main(void)
       uint32_t chunk = (remain>16) ? 16 : remain;
       
       // Send a piece
-      TF_Multipart_Payload(demo_tf, toSend, chunk);
+      demo_tf->Multipart_Payload(toSend, chunk);
       
       remain -= chunk;
       toSend += chunk;
     }
     
     // Done, close
-    TF_Multipart_Close(demo_tf);
+    demo_tf->Multipart_Close();
 }
 
 const char *romeo = "THE TRAGEDY OF ROMEO AND JULIET\n"

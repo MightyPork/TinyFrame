@@ -4,22 +4,30 @@ project(tf)
 # This is a dummy CMakeLists file for CLion, which still doesn't understand Makefiles.
 # Do not try to build the library using this file, it's here only for static analysis.
 
-set(CMAKE_CXX_STANDARD GNU89)
+set(CMAKE_CXX_STANDARD 14)
 
-set(SOURCE_FILES
-        demo/simple/test.c
-        demo/socket_demo/master.c
-        demo/socket_demo/slave.c
-        demo/socket_demo/TF_Config.h
-        demo/demo.c
-        demo/demo.h
-        TinyFrame.c
-        TinyFrame.h
-        TF_Config.example.h
-        demo/utils.c
-        demo/utils.h
+set(SOURCES_TINYFRAME
+        TinyFrame.hpp
+        TinyFrame_CRC.cpp
+        TinyFrame_CRC.hpp
+        TinyFrame_Types.hpp
         )
 
-include_directories(demo/simple)
+set(SOURCES_DEMO
+        demo/utils.cpp
+        demo/utils.hpp
+        )
 
-add_executable(tf ${SOURCE_FILES})
+add_executable(Tests ${SOURCES_TINYFRAME} tests/TF_SimpleTest.cpp)
+
+add_executable(demo.simple ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/simple/test.cpp)
+add_executable(demo.simple_custom_cksum ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/simple_custom_cksum/test.cpp)
+add_executable(demo.simple_long_payload ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/simple_long_payload/test.cpp)
+add_executable(demo.simple_multipart ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/simple_multipart/test.cpp)
+add_executable(demo.socket_demo.master ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/socket_demo/master.cpp)
+add_executable(demo.socket_demo.slave ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/socket_demo/slave.cpp)
+
+add_executable(Demo ${SOURCES_TINYFRAME} ${SOURCES_DEMO} demo/demo.hpp demo/demo.cpp)
+
+
+
