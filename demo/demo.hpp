@@ -10,7 +10,7 @@
 #include "utils.hpp"
 
 using namespace TinyFrame_n;
-using TinyFrame_Demo=TinyFrame<>;
+using TinyFrame_Demo=TinyFrameDefault;
 
 #define PORT 9798
 

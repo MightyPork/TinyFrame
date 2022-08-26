@@ -1319,4 +1319,6 @@ void _FN TinyFrame<TEMPLATE_PARMS>::Tick()
 
 } // TinyFrame_n
 
+using TinyFrameDefault=TinyFrame_n::TinyFrame<>;
+
 #endif // TinyFrameH

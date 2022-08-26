@@ -4,7 +4,7 @@
 #include "../utils.hpp"
 
 using namespace TinyFrame_n;
-using TinyFrame_Demo=TinyFrame<>;
+using TinyFrame_Demo=TinyFrameDefault;
 
 TinyFrame_Demo *demo_tf;
 

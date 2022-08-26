@@ -7,7 +7,7 @@
 #include "../demo.hpp"
 
 using namespace TinyFrame_n;
-using TinyFrame_Demo=TinyFrame<>;
+using TinyFrame_Demo=TinyFrameDefault;
 
 Result helloListener(Msg *msg)
 {
